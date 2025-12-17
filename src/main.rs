@@ -100,7 +100,7 @@ fn run_app(
                 // Copy output only
                 KeyCode::Char('y') => {
                     if let Some(output) = app.get_selected_output() {
-                        tmux::load_buffer(output)?;
+                        tmux::copy_to_clipboard(output)?;
                         return Ok(()); // Exit after copying
                     }
                 }
@@ -108,7 +108,15 @@ fn run_app(
                 // Copy full block (command + output)
                 KeyCode::Char('Y') => {
                     if let Some(full) = app.get_selected_full() {
-                        tmux::load_buffer(&full)?;
+                        tmux::copy_to_clipboard(&full)?;
+                        return Ok(()); // Exit after copying
+                    }
+                }
+
+                // Copy debug output to system clipboard (for diagnosing parsing issues)
+                KeyCode::Char('d') => {
+                    if let Some(debug) = app.get_selected_debug() {
+                        tmux::copy_to_clipboard(&debug)?;
                         return Ok(()); // Exit after copying
                     }
                 }

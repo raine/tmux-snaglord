@@ -3,10 +3,8 @@
 use regex::Regex;
 
 /// Default regex pattern for detecting shell prompts.
-/// Matches lines with common prompt characters: $ (bash), # (root), % (zsh), > (continuation)
-/// Uses [^"']* to avoid matching prompt chars inside quoted strings (e.g., code snippets)
-/// First character cannot be whitespace (rejects indented output like cargo progress bars)
-pub const DEFAULT_PROMPT_REGEX: &str = r#"^([^"'\s][^"']*)?[\$#%>] "#;
+/// Matches zsh-style prompts: path starting with / or ~, followed by ` % `
+pub const DEFAULT_PROMPT_REGEX: &str = r#"^[/~].* % "#;
 
 /// A block representing a command and its output
 #[derive(Debug, Clone)]
@@ -81,14 +79,65 @@ impl CommandState {
     }
 }
 
+/// Check if a line is likely right-aligned git status (not real output)
+fn is_git_status_line(line: &str) -> bool {
+    let clean_bytes = strip_ansi_escapes::strip(line);
+    let clean = String::from_utf8_lossy(&clean_bytes);
+    let trimmed = clean.trim();
+
+    // Must start with significant whitespace (10+ spaces)
+    let leading_spaces = clean.len() - clean.trim_start().len();
+    if leading_spaces < 10 {
+        return false;
+    }
+
+    // Check for common git status indicators
+    trimmed.contains("main")
+        || trimmed.contains("master")
+        || trimmed.contains('✱')
+        || trimmed.contains('✚')
+        || trimmed.contains('✖')
+}
+
 fn build_block(command_lines: &[&str], output_lines: &[&str]) -> CommandBlock {
     let full_command = command_lines.join("\n");
     let clean_bytes = strip_ansi_escapes::strip(&full_command);
 
+    // Filter out git status lines from output
+    let filtered_output: Vec<&str> = output_lines
+        .iter()
+        .filter(|line| !is_git_status_line(line))
+        .copied()
+        .collect();
+
     CommandBlock {
         command: full_command,
         clean_command: String::from_utf8_lossy(&clean_bytes).into_owned(),
-        output: output_lines.join("\n"),
+        output: filtered_output.join("\n"),
+    }
+}
+
+/// Extract the command portion after the prompt (trimmed)
+fn extract_command(clean_line: &str, prompt_regex: &Regex) -> Option<String> {
+    if let Some(m) = prompt_regex.find(clean_line) {
+        let after_prompt = &clean_line[m.end()..];
+
+        // If empty or whitespace-only, no command
+        if after_prompt.trim().is_empty() {
+            return None;
+        }
+
+        // Detect right-aligned git status: if text starts with many spaces (10+),
+        // it's likely right-aligned status info (e.g., "main ✚"), not a command
+        let leading_spaces = after_prompt.len() - after_prompt.trim_start().len();
+        if leading_spaces >= 10 {
+            return None;
+        }
+
+        // Return trimmed command (strips right-side git status too)
+        Some(after_prompt.trim().to_string())
+    } else {
+        None
     }
 }
 
@@ -104,13 +153,28 @@ pub fn parse_history(raw_content: &str, prompt_regex: &Regex) -> Vec<CommandBloc
     let mut current_command_lines: Vec<&str> = Vec::new();
     let mut current_output: Vec<&str> = Vec::new();
     let mut state = CommandState::default();
+    let mut last_command: Option<String> = None; // Track last command for deduplication
 
     for line in lines {
         // Strip ANSI codes for regex matching and syntax analysis
         let clean_bytes = strip_ansi_escapes::strip(line);
         let clean_line = String::from_utf8_lossy(&clean_bytes);
 
-        if prompt_regex.is_match(&clean_line) && !state.needs_continuation() {
+        // Check if line matches prompt pattern structurally
+        let is_prompt_match = prompt_regex.is_match(&clean_line);
+
+        // Extract command if prompt has actual command text
+        let extracted_cmd = extract_command(&clean_line, prompt_regex);
+        let is_valid_prompt = extracted_cmd.is_some();
+
+        // Skip duplicate consecutive commands (tmux captures both typing and after Enter)
+        let is_duplicate = if let (Some(cmd), Some(last)) = (&extracted_cmd, &last_command) {
+            cmd == last
+        } else {
+            false
+        };
+
+        if is_valid_prompt && !state.needs_continuation() && !is_duplicate {
             // New prompt detected and previous command is complete
             // Push previous block if exists
             if !current_command_lines.is_empty() {
@@ -124,11 +188,19 @@ pub fn parse_history(raw_content: &str, prompt_regex: &Regex) -> Vec<CommandBloc
 
             current_command_lines.push(line);
             state.process_line(&clean_line);
+            last_command = extracted_cmd;
+        } else if is_duplicate {
+            // Skip duplicate prompt lines entirely (don't add to output)
+            continue;
         } else if state.needs_continuation() {
             // Previous line was incomplete, this is a continuation
             current_command_lines.push(line);
             state.process_line(&clean_line);
         } else if !current_command_lines.is_empty() {
+            // Skip empty prompts (match regex but no command) - don't add to output
+            if is_prompt_match {
+                continue;
+            }
             // Command is complete, this is output
             current_output.push(line);
         }
@@ -447,26 +519,8 @@ mod tests {
     // These test the actual DEFAULT_PROMPT_REGEX constant
 
     #[test]
-    fn test_default_regex_bash_dollar() {
-        let content = "$ echo hello\nhello\n$ ls\nfile\n";
-        let re = Regex::new(super::DEFAULT_PROMPT_REGEX).unwrap();
-        let blocks = parse_history(content, &re);
-
-        assert_eq!(blocks.len(), 2);
-    }
-
-    #[test]
     fn test_default_regex_zsh_percent() {
         let content = "~/code % echo hello\nhello\n~/code % ls\nfile\n";
-        let re = Regex::new(super::DEFAULT_PROMPT_REGEX).unwrap();
-        let blocks = parse_history(content, &re);
-
-        assert_eq!(blocks.len(), 2);
-    }
-
-    #[test]
-    fn test_default_regex_root_hash() {
-        let content = "root@host# whoami\nroot\nroot@host# ls\n";
         let re = Regex::new(super::DEFAULT_PROMPT_REGEX).unwrap();
         let blocks = parse_history(content, &re);
 
@@ -513,5 +567,19 @@ mod tests {
         assert!(blocks[1].clean_command.contains("cargo build"));
         // The indented "100%" line should be in the output, not a separate block
         assert!(blocks[0].output.contains("100%"));
+    }
+
+    #[test]
+    fn test_default_regex_ignores_empty_prompts() {
+        // Empty prompts (just prompt char + whitespace) should NOT match
+        // This happens with tmux scrollback when prompt is redrawn or user presses Enter
+        let content = "~/code %                                                        \n~/code %                                                        \n~/code % echo foo                                               \nfoo\n~/code %                                                        \n~/code % ls\nfile.txt\n";
+        let re = Regex::new(super::DEFAULT_PROMPT_REGEX).unwrap();
+        let blocks = parse_history(content, &re);
+
+        // Only prompts with actual commands should match
+        assert_eq!(blocks.len(), 2);
+        assert!(blocks[0].clean_command.contains("ls"));
+        assert!(blocks[1].clean_command.contains("echo foo"));
     }
 }

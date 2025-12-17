@@ -95,4 +95,38 @@ impl App {
             .and_then(|i| self.blocks.get(i))
             .map(|b| format!("{}\n{}", b.command, b.output))
     }
+
+    /// Get debug-formatted output for diagnosing parsing issues
+    pub fn get_selected_debug(&self) -> Option<String> {
+        self.list_state
+            .selected()
+            .and_then(|i| self.blocks.get(i))
+            .map(|b| {
+                let mut out = String::new();
+                out.push_str("=== COMMAND (raw) ===\n");
+                for (i, line) in b.command.lines().enumerate() {
+                    out.push_str(&format!("{:3}| {}\n", i + 1, escape_debug(line)));
+                }
+                out.push_str("\n=== COMMAND (clean) ===\n");
+                for (i, line) in b.clean_command.lines().enumerate() {
+                    out.push_str(&format!("{:3}| {}\n", i + 1, line));
+                }
+                out.push_str("\n=== OUTPUT (raw) ===\n");
+                if b.output.is_empty() {
+                    out.push_str("(empty)\n");
+                } else {
+                    for (i, line) in b.output.lines().enumerate() {
+                        out.push_str(&format!("{:3}| {}\n", i + 1, escape_debug(line)));
+                    }
+                }
+                out
+            })
+    }
+}
+
+/// Escape special characters for debug display
+fn escape_debug(s: &str) -> String {
+    s.replace('\x1b', "\\e")
+        .replace('\t', "\\t")
+        .replace('\r', "\\r")
 }
