@@ -52,11 +52,7 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
         .collect();
 
     let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" Commands [j/k] "),
-        )
+        .block(Block::default().borders(Borders::RIGHT).title(" Commands "))
         .highlight_style(
             Style::default()
                 .add_modifier(Modifier::BOLD)
@@ -92,7 +88,7 @@ fn render_output_pane(frame: &mut Frame, app: &App, area: ratatui::layout::Rect)
     };
 
     let paragraph = Paragraph::new(content)
-        .block(Block::default().borders(Borders::ALL).title(title))
+        .block(Block::default().title(title))
         .wrap(Wrap { trim: false })
         .scroll((app.scroll_offset, 0));
 
