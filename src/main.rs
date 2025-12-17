@@ -100,7 +100,7 @@ fn run_app(
                 // Copy output only
                 KeyCode::Char('y') => {
                     if let Some(output) = app.get_selected_output() {
-                        tmux::copy_to_clipboard(output)?;
+                        tmux::copy_to_clipboard(&output)?;
                         return Ok(()); // Exit after copying
                     }
                 }

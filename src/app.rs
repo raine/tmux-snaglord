@@ -80,20 +80,20 @@ impl App {
         self.scroll_offset = self.scroll_offset.saturating_sub(1);
     }
 
-    /// Get the output of the currently selected block
-    pub fn get_selected_output(&self) -> Option<&str> {
+    /// Get the output of the currently selected block (ANSI stripped for copying)
+    pub fn get_selected_output(&self) -> Option<String> {
         self.list_state
             .selected()
             .and_then(|i| self.blocks.get(i))
-            .map(|b| b.output.as_str())
+            .map(|b| strip_ansi(&b.output))
     }
 
-    /// Get the full content (command + output) of the currently selected block
+    /// Get the full content (command + output) of the currently selected block (ANSI stripped)
     pub fn get_selected_full(&self) -> Option<String> {
         self.list_state
             .selected()
             .and_then(|i| self.blocks.get(i))
-            .map(|b| format!("{}\n{}", b.command, b.output))
+            .map(|b| format!("{}\n{}", strip_ansi(&b.command), strip_ansi(&b.output)))
     }
 
     /// Get debug-formatted output for diagnosing parsing issues
@@ -122,6 +122,12 @@ impl App {
                 out
             })
     }
+}
+
+/// Strip ANSI escape codes from a string
+fn strip_ansi(s: &str) -> String {
+    let bytes = strip_ansi_escapes::strip(s);
+    String::from_utf8_lossy(&bytes).into_owned()
 }
 
 /// Escape special characters for debug display
