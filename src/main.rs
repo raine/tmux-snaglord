@@ -113,8 +113,16 @@ fn run_app(
                     }
                 }
 
+                // Copy command only
+                KeyCode::Char('c') => {
+                    if let Some(cmd) = app.get_selected_command() {
+                        tmux::copy_to_clipboard(&cmd)?;
+                        return Ok(()); // Exit after copying
+                    }
+                }
+
                 // Copy debug output to system clipboard (for diagnosing parsing issues)
-                KeyCode::Char('d') => {
+                KeyCode::Char('D') => {
                     if let Some(debug) = app.get_selected_debug() {
                         tmux::copy_to_clipboard(&debug)?;
                         return Ok(()); // Exit after copying

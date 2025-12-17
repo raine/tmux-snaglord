@@ -88,6 +88,14 @@ impl App {
             .map(|b| strip_ansi(&b.output))
     }
 
+    /// Get the command of the currently selected block (ANSI stripped for copying)
+    pub fn get_selected_command(&self) -> Option<String> {
+        self.list_state
+            .selected()
+            .and_then(|i| self.blocks.get(i))
+            .map(|b| strip_ansi(&b.command))
+    }
+
     /// Get the full content (command + output) of the currently selected block (ANSI stripped)
     pub fn get_selected_full(&self) -> Option<String> {
         self.list_state
