@@ -4,7 +4,7 @@ use ansi_to_tui::IntoText;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style, Stylize},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
 };
@@ -13,10 +13,10 @@ use crate::app::App;
 
 /// Render the application UI
 pub fn render(frame: &mut Frame, app: &mut App) {
-    // Split into main area and footer
+    // Split into main area and footer (2 lines for border + text)
     let vertical = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(1), Constraint::Length(1)])
+        .constraints([Constraint::Min(1), Constraint::Length(2)])
         .split(frame.area());
 
     // Split main area into left (30%) and right (70%) panes
@@ -97,21 +97,32 @@ fn render_output_pane(frame: &mut Frame, app: &App, area: ratatui::layout::Rect)
 
 /// Render the help footer
 fn render_footer(frame: &mut Frame, area: ratatui::layout::Rect) {
+    let key_style = Style::default().fg(Color::Green);
+    let desc_style = Style::default().fg(Color::White);
+    let sep_style = Style::default().fg(Color::DarkGray);
+
     let help = Line::from(vec![
-        Span::raw(" "),
-        Span::styled("j/k", Style::default().bold()),
-        Span::raw(" navigate  "),
-        Span::styled("y", Style::default().bold()),
-        Span::raw(" copy output  "),
-        Span::styled("Y", Style::default().bold()),
-        Span::raw(" copy all  "),
-        Span::styled("c", Style::default().bold()),
-        Span::raw(" copy cmd  "),
-        Span::styled("q", Style::default().bold()),
-        Span::raw(" quit"),
+        Span::styled(" j/k ", key_style),
+        Span::styled("navigate", desc_style),
+        Span::styled("  ·  ", sep_style),
+        Span::styled("y ", key_style),
+        Span::styled("output", desc_style),
+        Span::styled("  ·  ", sep_style),
+        Span::styled("Y ", key_style),
+        Span::styled("all", desc_style),
+        Span::styled("  ·  ", sep_style),
+        Span::styled("c ", key_style),
+        Span::styled("cmd", desc_style),
+        Span::styled("  ·  ", sep_style),
+        Span::styled("q ", key_style),
+        Span::styled("quit", desc_style),
     ]);
 
-    let paragraph = Paragraph::new(help).style(Style::default().bg(Color::DarkGray));
+    let paragraph = Paragraph::new(help).block(
+        Block::default()
+            .borders(Borders::TOP)
+            .border_style(Style::default().fg(Color::DarkGray)),
+    );
 
     frame.render_widget(paragraph, area);
 }
