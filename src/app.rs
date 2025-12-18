@@ -254,6 +254,7 @@ impl App {
                     Mode::Paths => Mode::Commands,
                 };
                 self.scroll_offset = 0;
+                self.update_search_results();
             }
             Action::SwitchModePrev => {
                 self.mode = match self.mode {
@@ -262,6 +263,22 @@ impl App {
                     Mode::Paths => Mode::Json,
                 };
                 self.scroll_offset = 0;
+                self.update_search_results();
+            }
+            Action::SwitchToCommands => {
+                self.mode = Mode::Commands;
+                self.scroll_offset = 0;
+                self.update_search_results();
+            }
+            Action::SwitchToJson => {
+                self.mode = Mode::Json;
+                self.scroll_offset = 0;
+                self.update_search_results();
+            }
+            Action::SwitchToPaths => {
+                self.mode = Mode::Paths;
+                self.scroll_offset = 0;
+                self.update_search_results();
             }
         }
         Ok(UpdateResult::Continue)

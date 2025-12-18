@@ -96,14 +96,15 @@ Options:
 
 **Navigation**
 
-| Key       | Action                                |
-| --------- | ------------------------------------- |
-| `j` / `↓` | Next item                             |
-| `k` / `↑` | Previous item                         |
-| `Ctrl+d`  | Scroll output down                    |
-| `Ctrl+u`  | Scroll output up                      |
-| `Tab`     | Switch mode (Commands → JSON → Paths) |
-| `/`       | Enter search mode                     |
+| Key         | Action                                |
+| ----------- | ------------------------------------- |
+| `j` / `↓`   | Next item                             |
+| `k` / `↑`   | Previous item                         |
+| `Ctrl+d`    | Scroll output down                    |
+| `Ctrl+u`    | Scroll output up                      |
+| `1` / `2` / `3` | Switch to Commands / JSON / Paths |
+| `Tab`       | Cycle to next mode                    |
+| `/`         | Enter search mode                     |
 
 **Selection & copying**
 

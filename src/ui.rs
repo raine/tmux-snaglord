@@ -68,15 +68,15 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
     // Build title with mode tabs and count info
     let mode_tabs = Line::from(vec![
         Span::styled(
-            "[Commands]",
+            "[1:Commands]",
             Style::default()
                 .fg(Color::Green)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(" ", Style::default()),
-        Span::styled("[JSON]", Style::default().fg(Color::DarkGray)),
+        Span::styled("[2:JSON]", Style::default().fg(Color::DarkGray)),
         Span::styled(" ", Style::default()),
-        Span::styled("[Paths]", Style::default().fg(Color::DarkGray)),
+        Span::styled("[3:Paths]", Style::default().fg(Color::DarkGray)),
     ]);
 
     // Left title: shows selection count if items are pinned, otherwise "Commands (X/Y)"
@@ -146,16 +146,16 @@ fn render_json_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rec
 
     // Build title with mode tabs
     let mode_tabs = Line::from(vec![
-        Span::styled("[Commands]", Style::default().fg(Color::DarkGray)),
+        Span::styled("[1:Commands]", Style::default().fg(Color::DarkGray)),
         Span::styled(" ", Style::default()),
         Span::styled(
-            "[JSON]",
+            "[2:JSON]",
             Style::default()
                 .fg(Color::Blue)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(" ", Style::default()),
-        Span::styled("[Paths]", Style::default().fg(Color::DarkGray)),
+        Span::styled("[3:Paths]", Style::default().fg(Color::DarkGray)),
     ]);
 
     // Count info
@@ -247,12 +247,12 @@ fn render_paths_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Re
 
     // Build title with mode tabs
     let mode_tabs = Line::from(vec![
-        Span::styled("[Commands]", Style::default().fg(Color::DarkGray)),
+        Span::styled("[1:Commands]", Style::default().fg(Color::DarkGray)),
         Span::styled(" ", Style::default()),
-        Span::styled("[JSON]", Style::default().fg(Color::DarkGray)),
+        Span::styled("[2:JSON]", Style::default().fg(Color::DarkGray)),
         Span::styled(" ", Style::default()),
         Span::styled(
-            "[Paths]",
+            "[3:Paths]",
             Style::default()
                 .fg(Color::Magenta)
                 .add_modifier(Modifier::BOLD),
@@ -422,7 +422,7 @@ fn render_help_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
 
     let help = match app.mode {
         Mode::Commands => Line::from(vec![
-            Span::styled("TAB ", key_style),
+            Span::styled("1-3 ", key_style),
             Span::styled("mode", desc_style),
             Span::styled("  ·  ", sep_style),
             Span::styled("/ ", key_style),
@@ -447,7 +447,7 @@ fn render_help_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             Span::styled("quit", desc_style),
         ]),
         Mode::Json => Line::from(vec![
-            Span::styled("TAB ", key_style),
+            Span::styled("1-3 ", key_style),
             Span::styled("mode", desc_style),
             Span::styled("  ·  ", sep_style),
             Span::styled("/ ", key_style),
@@ -466,7 +466,7 @@ fn render_help_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             Span::styled("quit", desc_style),
         ]),
         Mode::Paths => Line::from(vec![
-            Span::styled("TAB ", key_style),
+            Span::styled("1-3 ", key_style),
             Span::styled("mode", desc_style),
             Span::styled("  ·  ", sep_style),
             Span::styled("/ ", key_style),

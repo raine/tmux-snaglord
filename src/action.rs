@@ -41,4 +41,10 @@ pub enum Action {
     SwitchMode,
     /// Switch to previous mode
     SwitchModePrev,
+    /// Switch directly to Commands mode
+    SwitchToCommands,
+    /// Switch directly to JSON mode
+    SwitchToJson,
+    /// Switch directly to Paths mode
+    SwitchToPaths,
 }

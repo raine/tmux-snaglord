@@ -222,6 +222,12 @@ fn get_action(key: KeyEvent, app: &App) -> Option<Action> {
     // Normal mode key mappings
     match key.code {
         KeyCode::Char('q') => Some(Action::Quit),
+
+        // Direct mode switching
+        KeyCode::Char('1') => Some(Action::SwitchToCommands),
+        KeyCode::Char('2') => Some(Action::SwitchToJson),
+        KeyCode::Char('3') => Some(Action::SwitchToPaths),
+
         KeyCode::Esc => {
             if !app.search_query.is_empty() {
                 Some(Action::ClearSearch)
