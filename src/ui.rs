@@ -32,6 +32,8 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
 /// Render the command list in the left pane
 fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
+    let selected_idx = app.list_state.selected();
+
     let items: Vec<ListItem> = app
         .blocks
         .iter()
@@ -47,18 +49,36 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
                 clean_cmd.clone()
             };
 
-            ListItem::new(Line::from(format!("{:3} {}", i + 1, display)))
+            // Style: dim line numbers, white commands
+            let is_selected = selected_idx == Some(i);
+            let num_style = if is_selected {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
+            let cmd_style = Style::default().fg(Color::White);
+
+            ListItem::new(Line::from(vec![
+                Span::styled(format!("{:3} ", i + 1), num_style),
+                Span::styled(display, cmd_style),
+            ]))
         })
         .collect();
 
-    let title = if let Some(idx) = app.list_state.selected() {
+    let title = if let Some(idx) = selected_idx {
         format!(" Commands ({}/{}) ", idx + 1, app.blocks.len())
     } else {
         " Commands ".to_string()
     };
 
     let list = List::new(items)
-        .block(Block::default().borders(Borders::RIGHT).title(title))
+        .block(
+            Block::default()
+                .borders(Borders::RIGHT)
+                .border_style(Style::default().fg(Color::DarkGray))
+                .title(title)
+                .title_style(Style::default().fg(Color::Green)),
+        )
         .highlight_style(
             Style::default()
                 .add_modifier(Modifier::BOLD)
