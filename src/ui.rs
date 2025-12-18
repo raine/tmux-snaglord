@@ -51,8 +51,14 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
         })
         .collect();
 
+    let title = if let Some(idx) = app.list_state.selected() {
+        format!(" Commands ({}/{}) ", idx + 1, app.blocks.len())
+    } else {
+        " Commands ".to_string()
+    };
+
     let list = List::new(items)
-        .block(Block::default().borders(Borders::RIGHT).title(" Commands "))
+        .block(Block::default().borders(Borders::RIGHT).title(title))
         .highlight_style(
             Style::default()
                 .add_modifier(Modifier::BOLD)
@@ -65,12 +71,6 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
 
 /// Render the output pane on the right
 fn render_output_pane(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
-    let title = if let Some(idx) = app.list_state.selected() {
-        format!(" Output ({}/{}) ", idx + 1, app.blocks.len())
-    } else {
-        " Output ".to_string()
-    };
-
     // Convert ANSI escape codes to ratatui styled Text
     // Show command + output together
     let content = if let Some(idx) = app.list_state.selected() {
