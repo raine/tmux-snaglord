@@ -29,6 +29,8 @@ pub struct JsonBlock {
     pub pretty: String,
     /// Raw JSON string for copying
     pub raw: String,
+    /// Parsed JSON value for syntax highlighting
+    pub value: Value,
 }
 
 /// Tracks shell syntax state for detecting incomplete commands
@@ -376,6 +378,7 @@ pub fn find_json_candidates(blocks: &[CommandBlock]) -> Vec<JsonBlock> {
                             name,
                             pretty,
                             raw: candidate,
+                            value,
                         });
 
                         i = j; // Skip past this JSON

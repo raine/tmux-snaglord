@@ -5,9 +5,10 @@ use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, List, ListItem, Paragraph},
 };
+use serde_json::Value;
 
 use crate::app::{App, Mode};
 
@@ -226,7 +227,7 @@ fn render_output_pane(frame: &mut Frame, app: &App, area: ratatui::layout::Rect)
         }
         Mode::Json => {
             if let Some(block) = app.get_selected_json_block() {
-                block.pretty.clone().into()
+                json_to_text(&block.value, 2)
             } else if app.json_blocks.is_empty() {
                 "No JSON objects found in history.".into()
             } else if app.json_filtered_indices.is_empty() && !app.search_query.is_empty() {
@@ -363,4 +364,265 @@ fn format_list_item(
         Span::styled(marker, Style::default().fg(Color::Yellow)),
         Span::styled(display, cmd_style),
     ]))
+}
+
+// === JSON Syntax Highlighting ===
+
+/// Convert a JSON value to syntax-highlighted ratatui Text
+fn json_to_text(value: &Value, indent_size: usize) -> Text<'static> {
+    let mut lines = Vec::new();
+    render_json_value(value, 0, indent_size, &mut lines);
+    Text::from(lines)
+}
+
+/// Styles for JSON syntax highlighting
+mod json_style {
+    use ratatui::style::{Color, Style};
+
+    pub fn key() -> Style {
+        Style::default().fg(Color::Cyan)
+    }
+    pub fn string() -> Style {
+        Style::default().fg(Color::Green)
+    }
+    pub fn number() -> Style {
+        Style::default().fg(Color::Yellow)
+    }
+    pub fn boolean() -> Style {
+        Style::default().fg(Color::Magenta)
+    }
+    pub fn null() -> Style {
+        Style::default().fg(Color::Red)
+    }
+    pub fn bracket() -> Style {
+        Style::default().fg(Color::White)
+    }
+    pub fn punctuation() -> Style {
+        Style::default().fg(Color::DarkGray)
+    }
+}
+
+/// Recursively render a JSON value with syntax highlighting
+fn render_json_value(
+    value: &Value,
+    indent_level: usize,
+    indent_size: usize,
+    lines: &mut Vec<Line<'static>>,
+) {
+    let indent = " ".repeat(indent_level * indent_size);
+
+    match value {
+        Value::Null => {
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::styled("null", json_style::null()),
+            ]));
+        }
+        Value::Bool(b) => {
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::styled(b.to_string(), json_style::boolean()),
+            ]));
+        }
+        Value::Number(n) => {
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::styled(n.to_string(), json_style::number()),
+            ]));
+        }
+        Value::String(s) => {
+            // Escape special characters for display
+            let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::styled(format!("\"{}\"", escaped), json_style::string()),
+            ]));
+        }
+        Value::Array(arr) => {
+            if arr.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::raw(indent),
+                    Span::styled("[]", json_style::bracket()),
+                ]));
+                return;
+            }
+
+            lines.push(Line::from(vec![
+                Span::raw(indent.clone()),
+                Span::styled("[", json_style::bracket()),
+            ]));
+
+            for (i, item) in arr.iter().enumerate() {
+                render_json_item(item, indent_level + 1, indent_size, i < arr.len() - 1, lines);
+            }
+
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::styled("]", json_style::bracket()),
+            ]));
+        }
+        Value::Object(obj) => {
+            if obj.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::raw(indent),
+                    Span::styled("{}", json_style::bracket()),
+                ]));
+                return;
+            }
+
+            lines.push(Line::from(vec![
+                Span::raw(indent.clone()),
+                Span::styled("{", json_style::bracket()),
+            ]));
+
+            let len = obj.len();
+            for (i, (key, val)) in obj.iter().enumerate() {
+                render_json_key_value(key, val, indent_level + 1, indent_size, i < len - 1, lines);
+            }
+
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::styled("}", json_style::bracket()),
+            ]));
+        }
+    }
+}
+
+/// Render an array item with proper comma handling
+fn render_json_item(
+    value: &Value,
+    indent_level: usize,
+    indent_size: usize,
+    trailing_comma: bool,
+    lines: &mut Vec<Line<'static>>,
+) {
+    let start_idx = lines.len();
+    render_json_value(value, indent_level, indent_size, lines);
+
+    // Add trailing comma to the last line of this item
+    if trailing_comma
+        && let Some(last) = lines.get_mut(start_idx..)
+        && let Some(line) = last.last_mut()
+    {
+        line.spans.push(Span::styled(",", json_style::punctuation()));
+    }
+}
+
+/// Render a key-value pair in an object
+fn render_json_key_value(
+    key: &str,
+    value: &Value,
+    indent_level: usize,
+    indent_size: usize,
+    trailing_comma: bool,
+    lines: &mut Vec<Line<'static>>,
+) {
+    let indent = " ".repeat(indent_level * indent_size);
+
+    match value {
+        // Primitives: key and value on same line
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {
+            let mut spans = vec![
+                Span::raw(indent),
+                Span::styled(format!("\"{}\"", key), json_style::key()),
+                Span::styled(": ", json_style::punctuation()),
+            ];
+
+            // Add the value inline
+            match value {
+                Value::Null => spans.push(Span::styled("null", json_style::null())),
+                Value::Bool(b) => spans.push(Span::styled(b.to_string(), json_style::boolean())),
+                Value::Number(n) => spans.push(Span::styled(n.to_string(), json_style::number())),
+                Value::String(s) => {
+                    let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
+                    spans.push(Span::styled(format!("\"{}\"", escaped), json_style::string()));
+                }
+                _ => unreachable!(),
+            }
+
+            if trailing_comma {
+                spans.push(Span::styled(",", json_style::punctuation()));
+            }
+
+            lines.push(Line::from(spans));
+        }
+        // Complex types: opening bracket on same line as key
+        Value::Array(arr) => {
+            if arr.is_empty() {
+                let mut spans = vec![
+                    Span::raw(indent),
+                    Span::styled(format!("\"{}\"", key), json_style::key()),
+                    Span::styled(": ", json_style::punctuation()),
+                    Span::styled("[]", json_style::bracket()),
+                ];
+                if trailing_comma {
+                    spans.push(Span::styled(",", json_style::punctuation()));
+                }
+                lines.push(Line::from(spans));
+                return;
+            }
+
+            // Key with opening bracket
+            lines.push(Line::from(vec![
+                Span::raw(indent.clone()),
+                Span::styled(format!("\"{}\"", key), json_style::key()),
+                Span::styled(": ", json_style::punctuation()),
+                Span::styled("[", json_style::bracket()),
+            ]));
+
+            // Array contents
+            for (i, item) in arr.iter().enumerate() {
+                render_json_item(item, indent_level + 1, indent_size, i < arr.len() - 1, lines);
+            }
+
+            // Closing bracket
+            let mut closing = vec![
+                Span::raw(indent),
+                Span::styled("]", json_style::bracket()),
+            ];
+            if trailing_comma {
+                closing.push(Span::styled(",", json_style::punctuation()));
+            }
+            lines.push(Line::from(closing));
+        }
+        Value::Object(obj) => {
+            if obj.is_empty() {
+                let mut spans = vec![
+                    Span::raw(indent),
+                    Span::styled(format!("\"{}\"", key), json_style::key()),
+                    Span::styled(": ", json_style::punctuation()),
+                    Span::styled("{}", json_style::bracket()),
+                ];
+                if trailing_comma {
+                    spans.push(Span::styled(",", json_style::punctuation()));
+                }
+                lines.push(Line::from(spans));
+                return;
+            }
+
+            // Key with opening brace
+            lines.push(Line::from(vec![
+                Span::raw(indent.clone()),
+                Span::styled(format!("\"{}\"", key), json_style::key()),
+                Span::styled(": ", json_style::punctuation()),
+                Span::styled("{", json_style::bracket()),
+            ]));
+
+            // Object contents
+            let len = obj.len();
+            for (i, (k, v)) in obj.iter().enumerate() {
+                render_json_key_value(k, v, indent_level + 1, indent_size, i < len - 1, lines);
+            }
+
+            // Closing brace
+            let mut closing = vec![
+                Span::raw(indent),
+                Span::styled("}", json_style::bracket()),
+            ];
+            if trailing_comma {
+                closing.push(Span::styled(",", json_style::punctuation()));
+            }
+            lines.push(Line::from(closing));
+        }
+    }
 }
