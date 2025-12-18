@@ -1,6 +1,8 @@
-# tmux-snag
-
-Snag anything from your tmux scrollback.
+<div align="center">
+  <img src="meta/logo.avif" alt="Raccoon logo" width="250" />
+  <h1>tmux-snag</h1>
+  <p>Snag anything from your tmux scrollback.</p>
+</div>
 
 `tmux-snag` parses your current tmux pane's scrollback history, separates
 commands from their output using regex prompt detection, and presents them in a
@@ -97,15 +99,15 @@ Options:
 
 **Navigation**
 
-| Key         | Action                                |
-| ----------- | ------------------------------------- |
-| `j` / `↓`   | Next item                             |
-| `k` / `↑`   | Previous item                         |
-| `Ctrl+d`    | Scroll output down                    |
-| `Ctrl+u`    | Scroll output up                      |
+| Key             | Action                            |
+| --------------- | --------------------------------- |
+| `j` / `↓`       | Next item                         |
+| `k` / `↑`       | Previous item                     |
+| `Ctrl+d`        | Scroll output down                |
+| `Ctrl+u`        | Scroll output up                  |
 | `1` / `2` / `3` | Switch to Commands / JSON / Paths |
-| `Tab`       | Cycle to next mode                    |
-| `/`         | Enter search mode                     |
+| `Tab`           | Cycle to next mode                |
+| `/`             | Enter search mode                 |
 
 **Selection & copying**
 
