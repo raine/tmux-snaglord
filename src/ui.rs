@@ -44,6 +44,8 @@ fn render_list_pane(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rec
 /// Render the command list in the left pane
 fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     let selected_idx = app.list_state.selected();
+    // Available width: area - border (1) - highlight symbol (2) - number (3) - marker (2)
+    let max_width = area.width.saturating_sub(8) as usize;
 
     let items: Vec<ListItem> = app
         .filtered_indices
@@ -53,7 +55,7 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
             let block = &app.blocks[real_idx];
             let is_focused = selected_idx == Some(visual_idx);
             let is_pinned = app.selection.contains(&real_idx);
-            format_list_item(visual_idx, &block.clean_command, is_focused, is_pinned)
+            format_list_item(visual_idx, &block.clean_command, is_focused, is_pinned, max_width)
         })
         .collect();
 
@@ -122,6 +124,8 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
 /// Render the JSON list in the left pane
 fn render_json_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     let selected_idx = app.json_list_state.selected();
+    // Available width: area - border (1) - highlight symbol (2) - number (4)
+    let max_width = area.width.saturating_sub(7) as usize;
 
     let items: Vec<ListItem> = app
         .json_filtered_indices
@@ -130,7 +134,7 @@ fn render_json_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rec
         .map(|(visual_idx, &real_idx)| {
             let block = &app.json_blocks[real_idx];
             let is_focused = selected_idx == Some(visual_idx);
-            format_json_list_item(visual_idx, &block.name, is_focused)
+            format_json_list_item(visual_idx, &block.name, is_focused, max_width)
         })
         .collect();
 
@@ -191,10 +195,10 @@ fn render_json_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rec
 }
 
 /// Format a JSON list item
-fn format_json_list_item(index: usize, name: &str, is_focused: bool) -> ListItem<'static> {
-    // Truncate long names
-    let display = if name.len() > 38 {
-        format!("{}…", &name[..37])
+fn format_json_list_item(index: usize, name: &str, is_focused: bool, max_width: usize) -> ListItem<'static> {
+    // Truncate long names to fit available width
+    let display = if name.len() > max_width {
+        format!("{}…", &name[..max_width.saturating_sub(1)])
     } else {
         name.to_string()
     };
@@ -216,6 +220,8 @@ fn format_json_list_item(index: usize, name: &str, is_focused: bool) -> ListItem
 /// Render the paths/URLs list in the left pane
 fn render_paths_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     let selected_idx = app.path_list_state.selected();
+    // Available width: area - border (1) - highlight symbol (2) - number (4) - icon (2)
+    let max_width = area.width.saturating_sub(9) as usize;
 
     let items: Vec<ListItem> = app
         .path_filtered_indices
@@ -224,7 +230,7 @@ fn render_paths_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Re
         .map(|(visual_idx, &real_idx)| {
             let block = &app.path_blocks[real_idx];
             let is_focused = selected_idx == Some(visual_idx);
-            format_path_list_item(visual_idx, block, is_focused)
+            format_path_list_item(visual_idx, block, is_focused, max_width)
         })
         .collect();
 
@@ -289,6 +295,7 @@ fn format_path_list_item(
     index: usize,
     block: &crate::parser::PathBlock,
     is_focused: bool,
+    max_width: usize,
 ) -> ListItem<'static> {
     // Type indicator (nerdfonts)
     let type_icon = match block.kind {
@@ -296,9 +303,9 @@ fn format_path_list_item(
         PathType::File => "\u{f4a5} ",  // nf-oct-file
     };
 
-    // Truncate long paths
-    let display = if block.raw.len() > 34 {
-        format!("{}…", &block.raw[..33])
+    // Truncate long paths to fit available width
+    let display = if block.raw.len() > max_width {
+        format!("{}…", &block.raw[..max_width.saturating_sub(1)])
     } else {
         block.raw.clone()
     };
@@ -483,10 +490,11 @@ fn format_list_item(
     command: &str,
     is_focused: bool,
     is_pinned: bool,
+    max_width: usize,
 ) -> ListItem<'static> {
-    // Truncate long commands (reduced to make room for pin marker)
-    let display = if command.len() > 38 {
-        format!("{}…", &command[..37])
+    // Truncate long commands to fit available width
+    let display = if command.len() > max_width {
+        format!("{}…", &command[..max_width.saturating_sub(1)])
     } else {
         command.to_string()
     };
