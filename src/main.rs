@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{Args, Parser, Subcommand};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
     execute,
@@ -23,8 +23,23 @@ use app::{App, UpdateResult};
 
 #[derive(Parser)]
 #[command(name = "tmux-snag")]
-#[command(about = "A TUI for copying terminal history from tmux")]
+#[command(about = "Snag anything from your tmux scrollback")]
 struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+
+    #[command(flatten)]
+    run_args: RunArgs,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Auto-detect shell prompt and save to config
+    Init,
+}
+
+#[derive(Args)]
+struct RunArgs {
     /// Regex pattern to identify command prompts
     #[arg(short, long)]
     prompt: Option<String>,
@@ -39,13 +54,73 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Some(Commands::Init) => run_init(cli.run_args.target.as_deref()),
+        None => run_tui(cli.run_args),
+    }
+}
+
+fn run_init(target: Option<&str>) -> Result<()> {
+    eprintln!("Detecting prompt pattern...\n");
+
+    let content = tmux::capture_pane(target).context("Failed to capture tmux pane")?;
+
+    let mut best_match: Option<(&presets::Preset, usize)> = None;
+
+    for preset in presets::PRESETS {
+        if let Ok(re) = Regex::new(preset.regex) {
+            let blocks = parser::parse_history(&content, &re);
+            let count = blocks.len();
+
+            if count > 0 {
+                eprintln!("  {:12} {} commands", preset.name, count);
+                match best_match {
+                    Some((_, best_count)) if count > best_count => {
+                        best_match = Some((preset, count));
+                    }
+                    None => {
+                        best_match = Some((preset, count));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    match best_match {
+        Some((preset, count)) => {
+            eprintln!(
+                "\nDetected '{}' ({} commands)",
+                preset.name, count
+            );
+
+            let config = config::Config {
+                preset: Some(preset.name.to_string()),
+                prompt: None,
+            };
+
+            let path = config.save()?;
+            eprintln!("Saved to {}", path.display());
+        }
+        None => {
+            eprintln!("No commands found with any preset.");
+            eprintln!("Make sure the pane has some command history visible.");
+            eprintln!("\nYou can configure a custom regex in ~/.config/tmux-snag/config.toml:");
+            eprintln!("  prompt = \"^your-prompt-pattern \"");
+        }
+    }
+
+    Ok(())
+}
+
+fn run_tui(args: RunArgs) -> Result<()> {
     // Load config file (syntax errors are fatal, missing file is OK)
     let config = config::Config::load().context("Failed to load config file")?;
 
-    let cli = Cli::parse();
-
     // Resolve prompt pattern: CLI > Config > Default
-    let prompt_pattern = resolve_prompt_pattern(&cli, &config)?;
+    let prompt_pattern = resolve_prompt_pattern(&args, &config)?;
 
     // Validate regex early (before potentially slow tmux capture)
     let prompt_re = Regex::new(&prompt_pattern).context(format!(
@@ -54,7 +129,7 @@ fn main() -> Result<()> {
     ))?;
 
     // Capture tmux pane content
-    let content = tmux::capture_pane(cli.target.as_deref())?;
+    let content = tmux::capture_pane(args.target.as_deref())?;
 
     // Parse into command blocks
     let blocks = parser::parse_history(&content, &prompt_re);
@@ -62,10 +137,7 @@ fn main() -> Result<()> {
     if blocks.is_empty() {
         eprintln!("No commands found.");
         eprintln!("Current pattern: {}", prompt_pattern);
-        eprintln!("\nTry --preset or --prompt. Available presets:");
-        for p in presets::PRESETS {
-            eprintln!("  {:12} - {}", p.name, p.description);
-        }
+        eprintln!("\nTry 'tmux-snag init' to auto-detect your prompt.");
         return Ok(());
     }
 
@@ -187,14 +259,14 @@ fn get_action(key: KeyEvent, app: &App) -> Option<Action> {
 }
 
 /// Resolve prompt pattern with precedence: CLI prompt > CLI preset > Config prompt > Config preset > Default
-fn resolve_prompt_pattern(cli: &Cli, config: &config::Config) -> Result<String> {
+fn resolve_prompt_pattern(args: &RunArgs, config: &config::Config) -> Result<String> {
     // 1. CLI explicit regex (highest priority)
-    if let Some(p) = &cli.prompt {
+    if let Some(p) = &args.prompt {
         return Ok(p.clone());
     }
 
     // 2. CLI preset (fatal if invalid - user explicitly requested it)
-    if let Some(name) = &cli.preset {
+    if let Some(name) = &args.preset {
         return presets::get_by_name(name)
             .map(|p| p.regex.to_string())
             .ok_or_else(|| {

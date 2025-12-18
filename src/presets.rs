@@ -16,8 +16,8 @@ pub const PRESETS: &[Preset] = &[
     },
     Preset {
         name: "zsh",
-        regex: r"^[/~].* % ",
-        description: "Standard zsh prompt (path % )",
+        regex: r"^.*% ",
+        description: "Default zsh prompt",
     },
     Preset {
         name: "oh-my-zsh",
