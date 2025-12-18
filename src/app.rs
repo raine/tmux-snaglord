@@ -4,12 +4,13 @@ use anyhow::Result;
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use ratatui::widgets::ListState;
+use regex::Regex;
 
 use clap::ValueEnum;
 
 use crate::action::Action;
 use crate::parser::{
-    CommandBlock, JsonBlock, PathBlock, find_json_candidates, find_path_candidates,
+    CommandBlock, JsonBlock, PathBlock, find_json_candidates, find_path_candidates, parse_history,
 };
 use crate::tmux;
 use crate::utils::{escape_debug, strip_ansi};
@@ -72,55 +73,92 @@ pub struct App {
     pub search_query: String,
     /// Whether we're in search mode
     pub is_searching: bool,
+
+    // Parsing state
+    /// Prompt pattern regex for re-parsing on reload
+    prompt_re: Regex,
+
+    // Error state
+    /// Transient error message to display in UI
+    pub error_msg: Option<String>,
 }
 
 impl App {
-    /// Create a new App with the given command blocks
-    pub fn new(blocks: Vec<CommandBlock>, nerd_fonts: bool, prompt_pattern: String) -> Self {
-        let mut list_state = ListState::default();
-        if !blocks.is_empty() {
-            list_state.select(Some(0));
-        }
-        let filtered_indices = (0..blocks.len()).collect();
-
-        // Parse JSONs from command outputs
-        let json_blocks = find_json_candidates(&blocks);
-        let mut json_list_state = ListState::default();
-        if !json_blocks.is_empty() {
-            json_list_state.select(Some(0));
-        }
-        let json_filtered_indices = (0..json_blocks.len()).collect();
-
-        // Parse paths/URLs from command outputs
-        let path_blocks = find_path_candidates(&blocks);
-        let mut path_list_state = ListState::default();
-        if !path_blocks.is_empty() {
-            path_list_state.select(Some(0));
-        }
-        let path_filtered_indices = (0..path_blocks.len()).collect();
-
-        Self {
+    /// Create a new App with the given content, prompt regex, and pattern string
+    pub fn new(content: &str, prompt_re: Regex, nerd_fonts: bool, prompt_pattern: String) -> Self {
+        let mut app = Self {
             mode: Mode::Commands,
             nerd_fonts,
             prompt_pattern,
-            blocks,
-            list_state,
-            filtered_indices,
+            blocks: Vec::new(),
+            list_state: ListState::default(),
+            filtered_indices: Vec::new(),
             selection: Vec::new(),
-            json_blocks,
-            json_list_state,
-            json_filtered_indices,
-            path_blocks,
-            path_list_state,
-            path_filtered_indices,
+            json_blocks: Vec::new(),
+            json_list_state: ListState::default(),
+            json_filtered_indices: Vec::new(),
+            path_blocks: Vec::new(),
+            path_list_state: ListState::default(),
+            path_filtered_indices: Vec::new(),
             scroll_offset: 0,
             search_query: String::new(),
             is_searching: false,
+            prompt_re,
+            error_msg: None,
+        };
+
+        app.ingest_content(content);
+        app
+    }
+
+    /// Parse content and populate/reset all state
+    fn ingest_content(&mut self, content: &str) {
+        // Parse into command blocks
+        self.blocks = parse_history(content, &self.prompt_re);
+        self.list_state = ListState::default();
+        if !self.blocks.is_empty() {
+            self.list_state.select(Some(0));
         }
+        self.filtered_indices = (0..self.blocks.len()).collect();
+        self.selection.clear();
+
+        // Parse JSONs from command outputs
+        self.json_blocks = find_json_candidates(&self.blocks);
+        self.json_list_state = ListState::default();
+        if !self.json_blocks.is_empty() {
+            self.json_list_state.select(Some(0));
+        }
+        self.json_filtered_indices = (0..self.json_blocks.len()).collect();
+
+        // Parse paths/URLs from command outputs
+        self.path_blocks = find_path_candidates(&self.blocks);
+        self.path_list_state = ListState::default();
+        if !self.path_blocks.is_empty() {
+            self.path_list_state.select(Some(0));
+        }
+        self.path_filtered_indices = (0..self.path_blocks.len()).collect();
+
+        // Reset view state
+        self.scroll_offset = 0;
+
+        // Re-run search if active
+        if !self.search_query.is_empty() {
+            self.update_search_results();
+        }
+    }
+
+    /// Capture content from a specific pane and reload the app state
+    fn reload_from_pane(&mut self, target: &str) -> Result<()> {
+        let content = tmux::capture_pane(Some(target))?;
+        self.ingest_content(&content);
+        Ok(())
     }
 
     /// Process an action and update application state
     pub fn update(&mut self, action: Action) -> Result<UpdateResult> {
+        // Clear any previous error on new action
+        self.error_msg = None;
+
         match action {
             Action::Quit => return Ok(UpdateResult::Quit),
 
@@ -287,6 +325,11 @@ impl App {
                 self.mode = Mode::Paths;
                 self.scroll_offset = 0;
                 self.update_search_results();
+            }
+            Action::LoadPreviousPane => {
+                if let Err(e) = self.reload_from_pane("previous") {
+                    self.error_msg = Some(format!("Failed to load previous pane: {}", e));
+                }
             }
         }
         Ok(UpdateResult::Continue)

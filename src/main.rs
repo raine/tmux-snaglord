@@ -139,8 +139,8 @@ fn run_tui(args: RunArgs) -> Result<()> {
     // Capture tmux pane content
     let content = tmux::capture_pane(args.target.as_deref())?;
 
-    // Parse into command blocks
-    let blocks = parser::parse_history(&content, &prompt_re);
+    // Create app with content and prompt regex
+    let mut app = App::new(&content, prompt_re, use_nerd_fonts, prompt_pattern);
 
     // Setup terminal
     enable_raw_mode()?;
@@ -148,9 +148,6 @@ fn run_tui(args: RunArgs) -> Result<()> {
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-
-    // Run the app
-    let mut app = App::new(blocks, use_nerd_fonts, prompt_pattern);
 
     // Apply the requested mode if present
     if let Some(mode) = args.mode {
@@ -234,6 +231,9 @@ fn get_action(key: KeyEvent, app: &App) -> Option<Action> {
         KeyCode::Char('1') => Some(Action::SwitchToCommands),
         KeyCode::Char('2') => Some(Action::SwitchToJson),
         KeyCode::Char('3') => Some(Action::SwitchToPaths),
+
+        // Load previous pane's scrollback
+        KeyCode::Char('P') => Some(Action::LoadPreviousPane),
 
         KeyCode::Esc => {
             if !app.search_query.is_empty() {

@@ -47,4 +47,6 @@ pub enum Action {
     SwitchToJson,
     /// Switch directly to Paths mode
     SwitchToPaths,
+    /// Reload content from the previous tmux pane
+    LoadPreviousPane,
 }

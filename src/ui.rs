@@ -441,11 +441,29 @@ fn render_output_pane(frame: &mut Frame, app: &App, area: ratatui::layout::Rect)
 
 /// Render the footer (help or search bar)
 fn render_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
-    if app.is_searching {
+    if let Some(ref err) = app.error_msg {
+        render_error_bar(frame, err, area);
+    } else if app.is_searching {
         render_search_bar(frame, app, area);
     } else {
         render_help_bar(frame, app, area);
     }
+}
+
+/// Render an error message bar
+fn render_error_bar(frame: &mut Frame, error: &str, area: ratatui::layout::Rect) {
+    let error_text = Line::from(vec![
+        Span::styled(" ✗ ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        Span::styled(error, Style::default().fg(Color::Red)),
+    ]);
+
+    let paragraph = Paragraph::new(error_text).block(
+        Block::default()
+            .borders(Borders::TOP)
+            .border_style(Style::default().fg(Color::Red)),
+    );
+
+    frame.render_widget(paragraph, area);
 }
 
 /// Render the search bar
@@ -476,6 +494,9 @@ fn render_help_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             Span::styled("1-3 ", key_style),
             Span::styled("mode", desc_style),
             Span::styled("  ·  ", sep_style),
+            Span::styled("P ", key_style),
+            Span::styled("prev pane", desc_style),
+            Span::styled("  ·  ", sep_style),
             Span::styled("/ ", key_style),
             Span::styled("search", desc_style),
             Span::styled("  ·  ", sep_style),
@@ -501,6 +522,9 @@ fn render_help_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             Span::styled("1-3 ", key_style),
             Span::styled("mode", desc_style),
             Span::styled("  ·  ", sep_style),
+            Span::styled("P ", key_style),
+            Span::styled("prev pane", desc_style),
+            Span::styled("  ·  ", sep_style),
             Span::styled("/ ", key_style),
             Span::styled("search", desc_style),
             Span::styled("  ·  ", sep_style),
@@ -519,6 +543,9 @@ fn render_help_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         Mode::Paths => Line::from(vec![
             Span::styled("1-3 ", key_style),
             Span::styled("mode", desc_style),
+            Span::styled("  ·  ", sep_style),
+            Span::styled("P ", key_style),
+            Span::styled("prev pane", desc_style),
             Span::styled("  ·  ", sep_style),
             Span::styled("/ ", key_style),
             Span::styled("search", desc_style),
