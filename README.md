@@ -91,9 +91,12 @@ Usage: tmux-snaglord [OPTIONS]
 Options:
   -p, --prompt <REGEX>    Regex pattern to identify command prompts
       --preset <NAME>     Preset pattern name (bash, zsh, fish, robbyrussell, starship, dollar, hash)
-  -t, --target <PANE>     Target tmux pane (e.g., "%0" or "session:window.pane")
+  -t, --target <PANE>     Target tmux pane (e.g., "%0", "session:window.pane", or "previous")
   -m, --mode <MODE>       Start in specific view mode [possible values: commands, json, paths]
 ```
+
+The special target `previous` captures the last active pane, useful when you want
+to run the tool from a different pane than the one you're inspecting.
 
 ### Key bindings
 
@@ -118,9 +121,21 @@ Options:
 | `y`     | Copy output only                     |
 | `Y`     | Copy full (command + output)         |
 | `c`     | Copy command only                    |
+| `p`     | Paste output to original pane        |
+| `P`     | Paste full to original pane          |
 | `D`     | Copy debug format (raw with escapes) |
 | `Esc`   | Clear selection/search, or quit      |
 | `q`     | Quit                                 |
+
+**Pane navigation**
+
+| Key | Action                                        |
+| --- | --------------------------------------------- |
+| `;` | Toggle between original and previous pane     |
+
+Use `;` to switch between viewing history from different panes without
+restarting. Paste actions (`p`/`P`) always target the original pane where the
+tool was launched.
 
 **Search mode**
 
