@@ -336,12 +336,25 @@ impl App {
                     self.error_msg = Some(format!("Failed to load previous pane: {}", e));
                 }
             }
-            Action::Paste => {
-                // Paste the same content that would be copied with the primary copy key
+            Action::PasteOutput => {
+                // Paste output only (mirrors 'y' copy behavior)
+                let payload = match self.mode {
+                    Mode::Commands => self.get_output_payload(),
+                    Mode::Json => self.get_selected_json_block().map(|b| b.raw.clone()),
+                    Mode::Paths => self.get_selected_path_block().map(|b| b.raw.clone()),
+                };
+
+                if let Some(content) = payload {
+                    tmux::send_keys(&self.target_pane_id, &content)?;
+                    return Ok(UpdateResult::Quit);
+                }
+            }
+            Action::PasteFull => {
+                // Paste command+output (mirrors 'Y' copy behavior)
                 let payload = match self.mode {
                     Mode::Commands => self.get_full_payload(),
                     Mode::Json => self.get_selected_json_block().map(|b| b.pretty.clone()),
-                    Mode::Paths => self.get_selected_path_block().map(|b| b.raw.clone()),
+                    Mode::Paths => self.get_selected_path_block().map(|b| b.path.clone()),
                 };
 
                 if let Some(content) = payload {
