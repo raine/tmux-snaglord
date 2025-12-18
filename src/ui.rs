@@ -40,13 +40,19 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
         .enumerate()
         .map(|(visual_idx, &real_idx)| {
             let block = &app.blocks[real_idx];
-            let is_selected = selected_idx == Some(visual_idx);
-            format_list_item(visual_idx, &block.clean_command, is_selected)
+            let is_focused = selected_idx == Some(visual_idx);
+            let is_pinned = app.selection.contains(&real_idx);
+            format_list_item(visual_idx, &block.clean_command, is_focused, is_pinned)
         })
         .collect();
 
-    // Left title: always shows "Commands (X/Y)"
-    let left_title = if let Some(idx) = selected_idx {
+    // Left title: shows selection count if items are pinned, otherwise "Commands (X/Y)"
+    let left_title = if !app.selection.is_empty() {
+        Line::from(vec![Span::styled(
+            format!(" {} selected ", app.selection.len()),
+            Style::default().fg(Color::Yellow),
+        )])
+    } else if let Some(idx) = selected_idx {
         Line::from(vec![Span::styled(
             format!(" Commands ({}/{}) ", idx + 1, app.filtered_indices.len()),
             Style::default().fg(Color::Green),
@@ -150,11 +156,14 @@ fn render_help_bar(frame: &mut Frame, area: ratatui::layout::Rect) {
         Span::styled("j/k ", key_style),
         Span::styled("nav", desc_style),
         Span::styled("  ·  ", sep_style),
-        Span::styled("y ", key_style),
-        Span::styled("output", desc_style),
+        Span::styled("spc ", key_style),
+        Span::styled("pin", desc_style),
         Span::styled("  ·  ", sep_style),
         Span::styled("Y ", key_style),
-        Span::styled("all", desc_style),
+        Span::styled("cmd+out", desc_style),
+        Span::styled("  ·  ", sep_style),
+        Span::styled("y ", key_style),
+        Span::styled("out", desc_style),
         Span::styled("  ·  ", sep_style),
         Span::styled("c ", key_style),
         Span::styled("cmd", desc_style),
@@ -173,23 +182,36 @@ fn render_help_bar(frame: &mut Frame, area: ratatui::layout::Rect) {
 }
 
 /// Format a single list item with consistent styling
-fn format_list_item(index: usize, command: &str, is_selected: bool) -> ListItem<'static> {
-    // Truncate long commands
-    let display = if command.len() > 40 {
-        format!("{}…", &command[..39])
+fn format_list_item(
+    index: usize,
+    command: &str,
+    is_focused: bool,
+    is_pinned: bool,
+) -> ListItem<'static> {
+    // Truncate long commands (reduced to make room for pin marker)
+    let display = if command.len() > 38 {
+        format!("{}…", &command[..37])
     } else {
         command.to_string()
     };
 
-    let num_style = if is_selected {
+    let num_style = if is_focused {
         Style::default().fg(Color::Green)
     } else {
         Style::default().fg(Color::DarkGray)
     };
-    let cmd_style = Style::default().fg(Color::White);
+
+    let cmd_style = if is_pinned {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default().fg(Color::White)
+    };
+
+    let marker = if is_pinned { "* " } else { "  " };
 
     ListItem::new(Line::from(vec![
-        Span::styled(format!("{:3} ", index + 1), num_style),
+        Span::styled(format!("{:3}", index + 1), num_style),
+        Span::styled(marker, Style::default().fg(Color::Yellow)),
         Span::styled(display, cmd_style),
     ]))
 }

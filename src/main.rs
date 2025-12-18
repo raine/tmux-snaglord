@@ -126,6 +126,8 @@ fn get_action(key: KeyEvent, app: &App) -> Option<Action> {
         KeyCode::Esc => {
             if !app.search_query.is_empty() {
                 Some(Action::ClearSearch)
+            } else if !app.selection.is_empty() {
+                Some(Action::ClearSelection)
             } else {
                 Some(Action::Quit)
             }
@@ -143,6 +145,10 @@ fn get_action(key: KeyEvent, app: &App) -> Option<Action> {
         KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             Some(Action::ScrollUp)
         }
+
+        // Scratchpad: toggle selection and submit
+        KeyCode::Char(' ') => Some(Action::ToggleSelection),
+        KeyCode::Enter => Some(Action::Submit),
 
         KeyCode::Char('y') => Some(Action::CopyOutput),
         KeyCode::Char('Y') => Some(Action::CopyFull),

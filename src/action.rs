@@ -31,4 +31,10 @@ pub enum Action {
     CopyCommand,
     /// Copy debug info to clipboard
     CopyDebug,
+    /// Toggle selection of the current item for scratchpad
+    ToggleSelection,
+    /// Clear all selections in the scratchpad
+    ClearSelection,
+    /// Submit/copy the current selection (or single item if none selected)
+    Submit,
 }

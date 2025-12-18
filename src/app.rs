@@ -32,6 +32,8 @@ pub struct App {
     pub is_searching: bool,
     /// Indices of blocks that match the current filter
     pub filtered_indices: Vec<usize>,
+    /// Indices of blocks selected for scratchpad (insertion order)
+    pub selection: Vec<usize>,
 }
 
 impl App {
@@ -51,6 +53,7 @@ impl App {
             search_query: String::new(),
             is_searching: false,
             filtered_indices,
+            selection: Vec::new(),
         }
     }
 
@@ -88,19 +91,19 @@ impl App {
             }
 
             Action::CopyOutput => {
-                if let Some(output) = self.get_selected_output() {
+                if let Some(output) = self.get_output_payload() {
                     tmux::copy_to_clipboard(&output)?;
                     return Ok(UpdateResult::Quit);
                 }
             }
             Action::CopyFull => {
-                if let Some(full) = self.get_selected_full() {
+                if let Some(full) = self.get_full_payload() {
                     tmux::copy_to_clipboard(&full)?;
                     return Ok(UpdateResult::Quit);
                 }
             }
             Action::CopyCommand => {
-                if let Some(cmd) = self.get_selected_command() {
+                if let Some(cmd) = self.get_command_payload() {
                     tmux::copy_to_clipboard(&cmd)?;
                     return Ok(UpdateResult::Quit);
                 }
@@ -111,8 +114,33 @@ impl App {
                     return Ok(UpdateResult::Quit);
                 }
             }
+
+            Action::ToggleSelection => {
+                self.toggle_selection();
+            }
+            Action::ClearSelection => {
+                self.selection.clear();
+            }
+            Action::Submit => {
+                // Submit copies full content (command + output), same as Y
+                if let Some(full) = self.get_full_payload() {
+                    tmux::copy_to_clipboard(&full)?;
+                    return Ok(UpdateResult::Quit);
+                }
+            }
         }
         Ok(UpdateResult::Continue)
+    }
+
+    /// Toggle the selection state of the current item
+    fn toggle_selection(&mut self) {
+        if let Some(idx) = self.get_current_data_index() {
+            if let Some(pos) = self.selection.iter().position(|&i| i == idx) {
+                self.selection.remove(pos);
+            } else {
+                self.selection.push(idx);
+            }
+        }
     }
 
     /// Get the actual data index from the visual list selection
@@ -216,25 +244,46 @@ impl App {
         self.update_search_results();
     }
 
-    /// Get the output of the currently selected block (ANSI stripped)
-    fn get_selected_output(&self) -> Option<String> {
-        self.get_current_data_index()
-            .and_then(|i| self.blocks.get(i))
-            .map(|b| strip_ansi(&b.output))
+    /// Helper to resolve payload based on selection state
+    /// If items are selected in scratchpad, returns joined content; otherwise single item
+    fn resolve_payload<F>(&self, extractor: F) -> Option<String>
+    where
+        F: Fn(&CommandBlock) -> String,
+    {
+        if !self.selection.is_empty() {
+            // Batch mode: join all selected blocks (insertion order)
+            let combined: Vec<String> = self
+                .selection
+                .iter()
+                .filter_map(|&i| self.blocks.get(i))
+                .map(&extractor)
+                .collect();
+            if combined.is_empty() {
+                None
+            } else {
+                Some(combined.join("\n"))
+            }
+        } else {
+            // Single mode: get current item
+            self.get_current_data_index()
+                .and_then(|i| self.blocks.get(i))
+                .map(extractor)
+        }
     }
 
-    /// Get the command text only (prompt removed)
-    fn get_selected_command(&self) -> Option<String> {
-        self.get_current_data_index()
-            .and_then(|i| self.blocks.get(i))
-            .map(|b| b.command_text.clone())
+    /// Get output payload (handles both single and batch selection)
+    fn get_output_payload(&self) -> Option<String> {
+        self.resolve_payload(|b| strip_ansi(&b.output))
     }
 
-    /// Get the full content (command + output) ANSI stripped
-    fn get_selected_full(&self) -> Option<String> {
-        self.get_current_data_index()
-            .and_then(|i| self.blocks.get(i))
-            .map(|b| format!("{}\n{}", strip_ansi(&b.command), strip_ansi(&b.output)))
+    /// Get command payload (handles both single and batch selection)
+    fn get_command_payload(&self) -> Option<String> {
+        self.resolve_payload(|b| b.command_text.clone())
+    }
+
+    /// Get full payload (handles both single and batch selection)
+    fn get_full_payload(&self) -> Option<String> {
+        self.resolve_payload(|b| format!("{}\n{}", strip_ansi(&b.command), strip_ansi(&b.output)))
     }
 
     /// Get debug-formatted output for diagnosing parsing issues
