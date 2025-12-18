@@ -355,6 +355,7 @@ impl App {
             }
             Action::PasteOutput => {
                 // Paste output only (mirrors 'y' copy behavior)
+                // Always paste to original pane (where tool was launched), not the viewed pane
                 let payload = match self.mode {
                     Mode::Commands => self.get_output_payload(),
                     Mode::Json => self.get_selected_json_block().map(|b| b.raw.clone()),
@@ -362,12 +363,13 @@ impl App {
                 };
 
                 if let Some(content) = payload {
-                    tmux::send_keys(&self.target_pane_id, &content)?;
+                    tmux::send_keys(&self.original_pane_id, &content)?;
                     return Ok(UpdateResult::Quit);
                 }
             }
             Action::PasteFull => {
                 // Paste command+output (mirrors 'Y' copy behavior)
+                // Always paste to original pane (where tool was launched), not the viewed pane
                 let payload = match self.mode {
                     Mode::Commands => self.get_full_payload(),
                     Mode::Json => self.get_selected_json_block().map(|b| b.pretty.clone()),
@@ -375,7 +377,7 @@ impl App {
                 };
 
                 if let Some(content) = payload {
-                    tmux::send_keys(&self.target_pane_id, &content)?;
+                    tmux::send_keys(&self.original_pane_id, &content)?;
                     return Ok(UpdateResult::Quit);
                 }
             }
