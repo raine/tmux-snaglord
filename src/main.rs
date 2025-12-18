@@ -144,7 +144,13 @@ fn run_tui(args: RunArgs) -> Result<()> {
     let content = tmux::capture_pane(&target_pane_id)?;
 
     // Create app with content and prompt regex
-    let mut app = App::new(&content, prompt_re, use_nerd_fonts, prompt_pattern, target_pane_id);
+    let mut app = App::new(
+        &content,
+        prompt_re,
+        use_nerd_fonts,
+        prompt_pattern,
+        target_pane_id,
+    );
 
     // Setup terminal
     enable_raw_mode()?;
@@ -231,10 +237,10 @@ fn get_action(key: KeyEvent, app: &App) -> Option<Action> {
     match key.code {
         KeyCode::Char('q') => Some(Action::Quit),
 
-        // Direct mode switching
+        // Direct mode switching (matches tab order: Commands, Paths, JSON)
         KeyCode::Char('1') => Some(Action::SwitchToCommands),
-        KeyCode::Char('2') => Some(Action::SwitchToJson),
-        KeyCode::Char('3') => Some(Action::SwitchToPaths),
+        KeyCode::Char('2') => Some(Action::SwitchToPaths),
+        KeyCode::Char('3') => Some(Action::SwitchToJson),
 
         // Load previous pane's scrollback (matches tmux's prefix-; for last pane)
         KeyCode::Char(';') => Some(Action::LoadPreviousPane),

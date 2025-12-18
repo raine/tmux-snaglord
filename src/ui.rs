@@ -453,7 +453,10 @@ fn render_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
 /// Render an error message bar
 fn render_error_bar(frame: &mut Frame, error: &str, area: ratatui::layout::Rect) {
     let error_text = Line::from(vec![
-        Span::styled(" ✗ ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " ✗ ",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
         Span::styled(error, Style::default().fg(Color::Red)),
     ]);
 

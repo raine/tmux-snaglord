@@ -30,7 +30,9 @@ fn get_previous_pane_id() -> Result<String> {
         .to_string();
 
     if pane_id.is_empty() {
-        anyhow::bail!("No previous pane found. Make sure you have multiple panes in the current window.");
+        anyhow::bail!(
+            "No previous pane found. Make sure you have multiple panes in the current window."
+        );
     }
 
     Ok(pane_id)
@@ -71,7 +73,16 @@ pub fn resolve_pane_id(target: Option<&str>) -> Result<String> {
 ///
 /// The `pane_id` should be a resolved pane ID (e.g., "%0") from `resolve_pane_id`.
 pub fn capture_pane(pane_id: &str) -> Result<String> {
-    let args = vec!["capture-pane", "-e", "-J", "-p", "-S", "-5000", "-t", pane_id];
+    let args = vec![
+        "capture-pane",
+        "-e",
+        "-J",
+        "-p",
+        "-S",
+        "-5000",
+        "-t",
+        pane_id,
+    ];
 
     let output = Command::new("tmux")
         .args(&args)

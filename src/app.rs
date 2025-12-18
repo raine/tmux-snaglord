@@ -88,7 +88,13 @@ pub struct App {
 
 impl App {
     /// Create a new App with the given content, prompt regex, and pattern string
-    pub fn new(content: &str, prompt_re: Regex, nerd_fonts: bool, prompt_pattern: String, target_pane_id: String) -> Self {
+    pub fn new(
+        content: &str,
+        prompt_re: Regex,
+        nerd_fonts: bool,
+        prompt_pattern: String,
+        target_pane_id: String,
+    ) -> Self {
         let mut app = Self {
             mode: Mode::Commands,
             nerd_fonts,
