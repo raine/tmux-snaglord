@@ -4,42 +4,41 @@
   <p>Reign over your tmux scrollback.</p>
 </div>
 
-`tmux-snaglord` parses your current tmux pane's scrollback history, separates
-commands from their output using regex prompt detection, and presents them in a
-structured interface. Fuzzy search history, extract JSON blobs, find file paths,
-and copy content to your clipboard. Copying in tmux has never been so easy.
+Stop scrolling through walls of terminal text. `tmux-snaglord` turns your tmux
+scrollback into a structured, searchable list of commands and their outputs.
+
+- **Find** any command or output instantly with fuzzy search
+- **Copy** clean output without the prompt or surrounding noise
+- **Extract** JSON (syntax highlighted) and file paths automatically
+- **Paste** directly into another pane. Perfect for feeding context to LLM
+  agents
 
 [Install](#install) · [Quick start](#quick-start) · [Usage](#usage) ·
 [Configuration](#configuration)
 
-## Demo
+![Demo](meta/demo.webp)
 
-```
-┌─ Commands ──────────────────────────┐┌─ Output ──────────────────────────────┐
-│  git status                         ││{                                      │
-│  curl api.local/users               ││  "id": 12,                            │
-│> cat config.json                    ││  "name": "tmux-snaglord",             │
-│  ls -la                             ││  "features": [                        │
-│                                     ││    "parsing",                         │
-│                                     ││    "tui",                             │
-│                                     ││    "json-highlighting"                │
-│                                     ││  ]                                    │
-│                                     ││}                                      │
-└─────────────────────────────────────┘└───────────────────────────────────────┘
- Tab: switch mode  Space: select  /: search  y: copy
-```
+### Why not tmux copy-mode?
+
+Tmux copy-mode requires you to scroll, visually locate boundaries, and manually
+select text. Command and output boundaries blur together. `tmux-snaglord` solves
+this by detecting prompts and treating each command + output as a single
+selectable block.
 
 ## Features
 
-- **Smart parsing**: Splits history into command/output blocks using regex
-  prompt detection
+- **Command blocks**: Each command and its output is a single selectable unit—no
+  manual boundary selection
+- **Cross-pane workflow**: View history from any pane, paste back to where you
+  started. Switch source panes with `;` without restarting
 - **Three viewing modes** (Tab to switch):
   - **Commands**: Browse commands and their outputs
-  - **JSON**: Detects and extracts JSON from output with syntax highlighting
+  - **JSON**: Auto-detects and extracts JSON with syntax highlighting
   - **Paths**: Extracts file paths and URLs for quick copying
 - **Fuzzy search**: Filter through history with `/`
-- **Multi-select**: Use space to select multiple blocks, copy all at once
-- **Shell presets**: Built-in support for bash, zsh, oh-my-zsh, starship, fish
+- **Multi-select**: Select multiple blocks with space, copy all at once
+- **Zero-config for standard prompts**: Auto-detects bash, zsh, fish, starship,
+  oh-my-zsh. Custom regex for others
 
 ## Install
 
@@ -59,21 +58,24 @@ cargo install tmux-snaglord
 
 1. Run `tmux-snaglord init` in a tmux pane with some command history
 2. The tool auto-detects your shell prompt and saves it to config
-3. Run `tmux-snaglord` — it just works now
+3. Add a keybinding to `~/.tmux.conf`:
 
-```sh
-$ tmux-snaglord init
-Detecting prompt pattern...
-
-  starship     12 commands
-  zsh          12 commands
-  fish         8 commands
-
-Detected 'starship' (12 commands)
-Saved to /Users/you/.config/tmux-snaglord/config.toml
+```tmux
+# Open in a popup (tmux 3.2+)
+bind-key C-y popup -E -w 60% -h 60% "tmux-snaglord"
 ```
 
 See [Prompt detection](#prompt-detection) if auto-detection doesn't work.
+
+### Use with CLI-based LLM agents
+
+When working with Claude Code, Aider, or similar tools, you often need to share
+command output from another pane:
+
+1. Run commands in your working pane
+2. Switch to the pane running your LLM agent
+3. Open tmux-snaglord and press `;` to load history from your previous pane
+4. Select the output and press `p` to paste directly into the conversation
 
 ## Usage
 
@@ -193,28 +195,6 @@ preset = "starship"
 | `starship`     | `^❯ `                             | Starship default prompt         |
 | `dollar`       | `^\$ `                            | Simple $ prompt                 |
 | `hash`         | `^# `                             | Root shell prompt               |
-
-## tmux integration
-
-Bind to a key in `~/.tmux.conf`:
-
-```tmux
-# Open in a popup (tmux 3.2+)
-bind-key C-y popup -E -w 60% -h 60% "tmux-snaglord"
-```
-
-### Feeding output to CLI-based LLM agents
-
-When working with Claude Code or similar CLI-based LLM agents, you often need to
-share command output from another pane:
-
-1. Run commands in your working pane
-2. Switch to the pane where Claude Code is running
-3. Open tmux-snaglord and press `;` to load history from your previous pane
-4. Select the output you need and press `p` to paste it directly into the
-   conversation
-
-This avoids manual copying and keeps your hands on the keyboard.
 
 ## Related projects
 
