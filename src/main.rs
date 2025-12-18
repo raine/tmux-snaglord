@@ -11,7 +11,9 @@ use std::io;
 
 mod action;
 mod app;
+mod config;
 mod parser;
+mod presets;
 mod tmux;
 mod ui;
 mod utils;
@@ -24,8 +26,12 @@ use app::{App, UpdateResult};
 #[command(about = "A TUI for copying terminal history from tmux")]
 struct Cli {
     /// Regex pattern to identify command prompts
-    #[arg(short, long, default_value = parser::DEFAULT_PROMPT_REGEX)]
-    prompt: String,
+    #[arg(short, long)]
+    prompt: Option<String>,
+
+    /// Preset pattern name (simple, zsh, oh-my-zsh, starship, fish)
+    #[arg(long)]
+    preset: Option<String>,
 
     /// Target tmux pane (e.g., "%0" or "session:window.pane")
     #[arg(short = 't', long)]
@@ -33,10 +39,19 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
+    // Load config file (syntax errors are fatal, missing file is OK)
+    let config = config::Config::load().context("Failed to load config file")?;
+
     let cli = Cli::parse();
 
+    // Resolve prompt pattern: CLI > Config > Default
+    let prompt_pattern = resolve_prompt_pattern(&cli, &config)?;
+
     // Validate regex early (before potentially slow tmux capture)
-    let prompt_re = Regex::new(&cli.prompt).context("Invalid prompt regex pattern")?;
+    let prompt_re = Regex::new(&prompt_pattern).context(format!(
+        "Invalid prompt regex pattern: '{}'",
+        prompt_pattern
+    ))?;
 
     // Capture tmux pane content
     let content = tmux::capture_pane(cli.target.as_deref())?;
@@ -45,8 +60,12 @@ fn main() -> Result<()> {
     let blocks = parser::parse_history(&content, &prompt_re);
 
     if blocks.is_empty() {
-        eprintln!("No commands found. Try adjusting the --prompt regex.");
-        eprintln!("Current pattern: {}", cli.prompt);
+        eprintln!("No commands found.");
+        eprintln!("Current pattern: {}", prompt_pattern);
+        eprintln!("\nTry --preset or --prompt. Available presets:");
+        for p in presets::PRESETS {
+            eprintln!("  {:12} - {}", p.name, p.description);
+        }
         return Ok(());
     }
 
@@ -157,4 +176,48 @@ fn get_action(key: KeyEvent, app: &App) -> Option<Action> {
 
         _ => None,
     }
+}
+
+/// Resolve prompt pattern with precedence: CLI prompt > CLI preset > Config prompt > Config preset > Default
+fn resolve_prompt_pattern(cli: &Cli, config: &config::Config) -> Result<String> {
+    // 1. CLI explicit regex (highest priority)
+    if let Some(p) = &cli.prompt {
+        return Ok(p.clone());
+    }
+
+    // 2. CLI preset (fatal if invalid - user explicitly requested it)
+    if let Some(name) = &cli.preset {
+        return presets::get_by_name(name)
+            .map(|p| p.regex.to_string())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Unknown preset '{}'. Available: {}",
+                    name,
+                    presets::PRESETS
+                        .iter()
+                        .map(|p| p.name)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            });
+    }
+
+    // 3. Config explicit regex
+    if let Some(p) = &config.prompt {
+        return Ok(p.clone());
+    }
+
+    // 4. Config preset (warn and fallback if invalid)
+    if let Some(name) = &config.preset {
+        if let Some(preset) = presets::get_by_name(name) {
+            return Ok(preset.regex.to_string());
+        }
+        eprintln!(
+            "Warning: Unknown preset '{}' in config, using default",
+            name
+        );
+    }
+
+    // 5. Default
+    Ok(parser::DEFAULT_PROMPT_REGEX.to_string())
 }
