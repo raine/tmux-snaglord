@@ -3,7 +3,7 @@
 use ansi_to_tui::IntoText;
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
@@ -66,22 +66,41 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
         })
         .collect();
 
-    let title = if let Some(idx) = selected_idx {
-        format!(" Commands ({}/{}) ", idx + 1, app.filtered_indices.len())
-    } else if app.filtered_indices.is_empty() && !app.search_query.is_empty() {
-        " No matches ".to_string()
+    // Left title: always shows "Commands (X/Y)"
+    let left_title = if let Some(idx) = selected_idx {
+        Line::from(vec![Span::styled(
+            format!(" Commands ({}/{}) ", idx + 1, app.filtered_indices.len()),
+            Style::default().fg(Color::Green),
+        )])
     } else {
-        " Commands ".to_string()
+        Line::from(vec![Span::styled(
+            " Commands ",
+            Style::default().fg(Color::Green),
+        )])
     };
 
+    // Build block with left title
+    let mut block = Block::default()
+        .borders(Borders::RIGHT)
+        .border_style(Style::default().fg(Color::DarkGray))
+        .title_top(left_title);
+
+    // Add right-aligned filter indicator when search is active
+    if !app.search_query.is_empty() {
+        let filter_title = Line::from(vec![Span::styled(
+            format!(
+                " \"{}\" ({} of {}) ",
+                app.search_query,
+                app.filtered_indices.len(),
+                app.blocks.len()
+            ),
+            Style::default().fg(Color::Yellow),
+        )]);
+        block = block.title_top(filter_title.alignment(Alignment::Right));
+    }
+
     let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::RIGHT)
-                .border_style(Style::default().fg(Color::DarkGray))
-                .title(title)
-                .title_style(Style::default().fg(Color::Green)),
-        )
+        .block(block)
         .highlight_style(
             Style::default()
                 .add_modifier(Modifier::BOLD)
