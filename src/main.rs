@@ -113,7 +113,7 @@ fn run_init(target: Option<&str>) -> Result<()> {
         None => {
             eprintln!("No commands found with any preset.");
             eprintln!("Make sure the pane has some command history visible.");
-            eprintln!("\nYou can configure a custom regex in ~/.config/tmux-snag/config.toml:");
+            eprintln!("\nYou can configure a custom regex in ~/.config/tmux-snaglord/config.toml:");
             eprintln!("  prompt = \"^your-prompt-pattern \"");
         }
     }
@@ -331,6 +331,6 @@ fn resolve_prompt_pattern(args: &RunArgs, config: &config::Config) -> Result<Str
 
     // 5. No configuration found
     Err(anyhow::anyhow!(
-        "No prompt pattern configured. Run 'tmux-snag init' to auto-detect your shell prompt."
+        "No prompt pattern configured. Run 'tmux-snaglord init' to auto-detect your shell prompt."
     ))
 }

@@ -400,7 +400,7 @@ fn render_output_pane(frame: &mut Frame, app: &App, area: ratatui::layout::Rect)
                     ]),
                     Line::from(""),
                     Line::from(Span::styled(
-                        "Try 'tmux-snag init' to auto-detect your prompt.",
+                        "Try 'tmux-snaglord init' to auto-detect your prompt.",
                         Style::default().fg(Color::DarkGray),
                     )),
                 ])
