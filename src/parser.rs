@@ -13,6 +13,8 @@ pub struct CommandBlock {
     pub command: String,
     /// The command line with ANSI codes stripped (for display in list)
     pub clean_command: String,
+    /// The command text only (prompt removed, ANSI stripped) for copying
+    pub command_text: String,
     /// The output following the command
     pub output: String,
 }
@@ -99,7 +101,11 @@ fn is_git_status_line(line: &str) -> bool {
         || trimmed.contains('✖')
 }
 
-fn build_block(command_lines: &[&str], output_lines: &[&str]) -> CommandBlock {
+fn build_block(
+    command_lines: &[&str],
+    output_lines: &[&str],
+    prompt_regex: &Regex,
+) -> CommandBlock {
     let full_command = command_lines.join("\n");
     let clean_bytes = strip_ansi_escapes::strip(&full_command);
 
@@ -110,14 +116,38 @@ fn build_block(command_lines: &[&str], output_lines: &[&str]) -> CommandBlock {
         .copied()
         .collect();
 
+    // Build command_text: strip prompt from first line, keep continuation lines as-is
+    let mut command_text = String::new();
+
+    if let Some(first) = command_lines.first() {
+        let clean_first_bytes = strip_ansi_escapes::strip(first);
+        let clean_first = String::from_utf8_lossy(&clean_first_bytes);
+
+        if let Some(cmd) = extract_command(&clean_first, prompt_regex) {
+            command_text.push_str(&cmd);
+        } else {
+            // Fallback (shouldn't happen due to parse_history logic)
+            command_text.push_str(clean_first.trim());
+        }
+    }
+
+    // Continuation lines (no prompt, just strip ANSI)
+    for line in command_lines.iter().skip(1) {
+        let clean_bytes = strip_ansi_escapes::strip(line);
+        let clean_line = String::from_utf8_lossy(&clean_bytes);
+        command_text.push('\n');
+        command_text.push_str(&clean_line);
+    }
+
     CommandBlock {
         command: full_command,
         clean_command: String::from_utf8_lossy(&clean_bytes).into_owned(),
+        command_text,
         output: filtered_output.join("\n"),
     }
 }
 
-/// Extract the command portion after the prompt (trimmed)
+/// Extract the command portion after the prompt (trimmed, right-prompt stripped)
 fn extract_command(clean_line: &str, prompt_regex: &Regex) -> Option<String> {
     if let Some(m) = prompt_regex.find(clean_line) {
         let after_prompt = &clean_line[m.end()..];
@@ -134,11 +164,43 @@ fn extract_command(clean_line: &str, prompt_regex: &Regex) -> Option<String> {
             return None;
         }
 
-        // Return trimmed command (strips right-side git status too)
-        Some(after_prompt.trim().to_string())
+        // Strip right-side prompt: find sequence of 10+ spaces and take only what's before
+        let trimmed = after_prompt.trim_start();
+        let command = if let Some(pos) = find_right_prompt_start(trimmed) {
+            trimmed[..pos].trim_end()
+        } else {
+            trimmed.trim_end()
+        };
+
+        if command.is_empty() {
+            return None;
+        }
+
+        Some(command.to_string())
     } else {
         None
     }
+}
+
+/// Find the start of right-aligned prompt (10+ consecutive spaces)
+fn find_right_prompt_start(s: &str) -> Option<usize> {
+    let mut space_count = 0;
+    let mut space_start = 0;
+
+    for (i, c) in s.char_indices() {
+        if c == ' ' {
+            if space_count == 0 {
+                space_start = i;
+            }
+            space_count += 1;
+            if space_count >= 10 {
+                return Some(space_start);
+            }
+        } else {
+            space_count = 0;
+        }
+    }
+    None
 }
 
 /// Parse raw terminal content into command blocks
@@ -178,7 +240,11 @@ pub fn parse_history(raw_content: &str, prompt_regex: &Regex) -> Vec<CommandBloc
             // New prompt detected and previous command is complete
             // Push previous block if exists
             if !current_command_lines.is_empty() {
-                blocks.push(build_block(&current_command_lines, &current_output));
+                blocks.push(build_block(
+                    &current_command_lines,
+                    &current_output,
+                    prompt_regex,
+                ));
             }
 
             // Start new block
@@ -209,7 +275,11 @@ pub fn parse_history(raw_content: &str, prompt_regex: &Regex) -> Vec<CommandBloc
 
     // Push final block
     if !current_command_lines.is_empty() {
-        blocks.push(build_block(&current_command_lines, &current_output));
+        blocks.push(build_block(
+            &current_command_lines,
+            &current_output,
+            prompt_regex,
+        ));
     }
 
     // Reverse so newest commands appear first
@@ -581,5 +651,42 @@ mod tests {
         assert_eq!(blocks.len(), 2);
         assert!(blocks[0].clean_command.contains("ls"));
         assert!(blocks[1].clean_command.contains("echo foo"));
+    }
+
+    #[test]
+    fn test_command_text_strips_right_prompt() {
+        // Real zsh prompt with right-aligned git status separated by many spaces
+        // The command_text field should contain only "history", not the git branch
+        let content = "~/c/tmux-copy-tool % history                                                                                                                main\n  123  ls\n  124  cd foo\n";
+        let re = Regex::new(super::DEFAULT_PROMPT_REGEX).unwrap();
+        let blocks = parse_history(content, &re);
+
+        assert_eq!(blocks.len(), 1);
+        // clean_command contains the full line (for display)
+        assert!(blocks[0].clean_command.contains("main"));
+        // command_text should have right-prompt stripped (for copying)
+        assert_eq!(blocks[0].command_text, "history");
+    }
+
+    #[test]
+    fn test_command_text_without_right_prompt() {
+        // Command without right-aligned prompt should work normally
+        let content = "~/code % echo hello\nworld\n";
+        let re = Regex::new(super::DEFAULT_PROMPT_REGEX).unwrap();
+        let blocks = parse_history(content, &re);
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].command_text, "echo hello");
+    }
+
+    #[test]
+    fn test_command_text_multiline() {
+        // Multiline command should preserve continuation lines
+        let content = "$ echo \\\ncontinued\nthe output\n";
+        let re = Regex::new(r"^\$ ").unwrap();
+        let blocks = parse_history(content, &re);
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].command_text, "echo \\\ncontinued");
     }
 }
