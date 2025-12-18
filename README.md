@@ -90,6 +90,7 @@ Options:
   -p, --prompt <REGEX>    Regex pattern to identify command prompts
       --preset <NAME>     Preset pattern name (bash, zsh, fish, robbyrussell, starship, dollar, hash)
   -t, --target <PANE>     Target tmux pane (e.g., "%0" or "session:window.pane")
+  -m, --mode <MODE>       Start in specific view mode [possible values: commands, json, paths]
 ```
 
 ### Key bindings

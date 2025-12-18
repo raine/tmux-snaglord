@@ -5,6 +5,8 @@ use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use ratatui::widgets::ListState;
 
+use clap::ValueEnum;
+
 use crate::action::Action;
 use crate::parser::{
     CommandBlock, JsonBlock, PathBlock, find_json_candidates, find_path_candidates,
@@ -13,7 +15,7 @@ use crate::tmux;
 use crate::utils::{escape_debug, strip_ansi};
 
 /// Application mode (Commands, JSON, or Paths view)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Mode {
     Commands,
     Json,

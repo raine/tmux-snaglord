@@ -51,6 +51,10 @@ struct RunArgs {
     /// Target tmux pane (e.g., "%0" or "session:window.pane")
     #[arg(short = 't', long)]
     target: Option<String>,
+
+    /// Start in specific view mode
+    #[arg(short, long, value_enum)]
+    mode: Option<app::Mode>,
 }
 
 fn main() -> Result<()> {
@@ -150,6 +154,12 @@ fn run_tui(args: RunArgs) -> Result<()> {
 
     // Run the app
     let mut app = App::new(blocks);
+
+    // Apply the requested mode if present
+    if let Some(mode) = args.mode {
+        app.mode = mode;
+    }
+
     let res = run_app(&mut terminal, &mut app);
 
     // Restore terminal
