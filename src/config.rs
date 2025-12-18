@@ -21,8 +21,8 @@ pub struct Config {
 }
 
 impl Config {
-    /// Load configuration from ~/.config/tmux-snag/config.toml
-    /// (or $XDG_CONFIG_HOME/tmux-snag/config.toml if set)
+    /// Load configuration from ~/.config/tmux-snaglord/config.toml
+    /// (or $XDG_CONFIG_HOME/tmux-snaglord/config.toml if set)
     pub fn load() -> Result<Self> {
         if let Some(path) = Self::config_path()
             && path.exists()
@@ -60,6 +60,6 @@ impl Config {
                     .map(|h| PathBuf::from(h).join(".config"))
             })?;
 
-        Some(config_dir.join("tmux-snag").join("config.toml"))
+        Some(config_dir.join("tmux-snaglord").join("config.toml"))
     }
 }

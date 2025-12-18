@@ -1,5 +1,5 @@
 [package]
-name = "tmux-snag"
+name = "tmux-snaglord"
 version = "0.1.0"
 edition = "2024"
 authors = [""]

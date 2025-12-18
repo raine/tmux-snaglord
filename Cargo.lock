@@ -910,7 +910,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tmux-snag"
+name = "tmux-snaglord"
 version = "0.1.0"
 dependencies = [
  "ansi-to-tui",

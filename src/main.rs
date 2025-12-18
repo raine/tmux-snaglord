@@ -22,8 +22,8 @@ use action::Action;
 use app::{App, UpdateResult};
 
 #[derive(Parser)]
-#[command(name = "tmux-snag")]
-#[command(about = "Snag anything from your tmux scrollback")]
+#[command(name = "tmux-snaglord")]
+#[command(about = "Reign over your tmux scrollback")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,

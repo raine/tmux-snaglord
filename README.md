@@ -1,10 +1,10 @@
 <div align="center">
   <img src="meta/logo.avif" alt="Raccoon logo" width="250" />
-  <h1>tmux-snag</h1>
-  <p>Snag anything from your tmux scrollback.</p>
+  <h1>tmux-snaglord</h1>
+  <p>Reign over your tmux scrollback.</p>
 </div>
 
-`tmux-snag` parses your current tmux pane's scrollback history, separates
+`tmux-snaglord` parses your current tmux pane's scrollback history, separates
 commands from their output using regex prompt detection, and presents them in a
 structured interface. Fuzzy search history, extract JSON blobs, find file paths,
 and copy content to your clipboard. Copying in tmux has never been so easy.
@@ -18,7 +18,7 @@ and copy content to your clipboard. Copying in tmux has never been so easy.
 ┌─ Commands ──────────────────────────┐┌─ Output ──────────────────────────────┐
 │  git status                         ││{                                      │
 │  curl api.local/users               ││  "id": 12,                            │
-│> cat config.json                    ││  "name": "tmux-snag",                 │
+│> cat config.json                    ││  "name": "tmux-snaglord",                 │
 │  ls -la                             ││  "features": [                        │
 │                                     ││    "parsing",                         │
 │                                     ││    "tui",                             │
@@ -46,23 +46,23 @@ and copy content to your clipboard. Copying in tmux has never been so easy.
 ### Homebrew (macOS/Linux)
 
 ```sh
-brew install raine/tap/tmux-snag
+brew install raine/tap/tmux-snaglord
 ```
 
 ### Cargo
 
 ```sh
-cargo install tmux-snag
+cargo install tmux-snaglord
 ```
 
 ## Quick start
 
-1. Run `tmux-snag init` in a tmux pane with some command history
+1. Run `tmux-snaglord init` in a tmux pane with some command history
 2. The tool auto-detects your shell prompt and saves it to config
-3. Run `tmux-snag` — it just works now
+3. Run `tmux-snaglord` — it just works now
 
 ```sh
-$ tmux-snag init
+$ tmux-snaglord init
 Detecting prompt pattern...
 
   starship     12 commands
@@ -70,7 +70,7 @@ Detecting prompt pattern...
   fish         8 commands
 
 Detected 'starship' (12 commands)
-Saved to /Users/you/.config/tmux-snag/config.toml
+Saved to /Users/you/.config/tmux-snaglord/config.toml
 ```
 
 See [Prompt detection](#prompt-detection) if auto-detection doesn't work.
@@ -78,15 +78,15 @@ See [Prompt detection](#prompt-detection) if auto-detection doesn't work.
 ## Usage
 
 ```sh
-tmux-snag          # Run the TUI
-tmux-snag init     # Auto-detect prompt and save to config
-tmux-snag -t "%1"  # Target a specific pane
+tmux-snaglord          # Run the TUI
+tmux-snaglord init     # Auto-detect prompt and save to config
+tmux-snaglord -t "%1"  # Target a specific pane
 ```
 
 ### CLI options
 
 ```
-Usage: tmux-snag [OPTIONS]
+Usage: tmux-snaglord [OPTIONS]
 
 Options:
   -p, --prompt <REGEX>    Regex pattern to identify command prompts
@@ -133,7 +133,7 @@ Options:
 
 ## Prompt detection
 
-`tmux-snag` captures the visible content of your tmux pane and uses a regex
+`tmux-snaglord` captures the visible content of your tmux pane and uses a regex
 pattern to find shell prompts. Each prompt marks the start of a new command, and
 everything until the next prompt is that command's output:
 
@@ -145,7 +145,7 @@ file2.txt             ← output
 hello world           ← output
 ```
 
-If no commands are found, run `tmux-snag init` to auto-detect the best preset
+If no commands are found, run `tmux-snaglord init` to auto-detect the best preset
 for your shell, or configure a custom pattern.
 
 **Note:** Because this tool relies on regex pattern matching, detection accuracy
@@ -154,7 +154,7 @@ output that resembles your prompt may cause incorrect parsing.
 
 ## Configuration
 
-You can persist preferences in `~/.config/tmux-snag/config.toml`:
+You can persist preferences in `~/.config/tmux-snaglord/config.toml`:
 
 ```toml
 # Use a built-in preset
@@ -185,7 +185,7 @@ Bind to a key in `~/.tmux.conf`:
 
 ```tmux
 # Open in a popup (tmux 3.2+)
-bind-key C-y popup -E -w 60% -h 60% "tmux-snag"
+bind-key C-y popup -E -w 60% -h 60% "tmux-snaglord"
 ```
 
 ## Related projects
