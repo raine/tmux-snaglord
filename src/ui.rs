@@ -1,6 +1,7 @@
 //! TUI rendering logic
 
 use ansi_to_tui::IntoText;
+use unicode_width::UnicodeWidthStr;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout},
@@ -16,6 +17,31 @@ use crate::parser::PathType;
 /// Powerline glyphs for capsule-style tabs
 const PL_LEFT_CAP: &str = "\u{e0b6}"; //
 const PL_RIGHT_CAP: &str = "\u{e0b4}"; //
+
+/// Truncate a string to fit within max_width display columns, adding ellipsis if needed.
+/// Uses unicode width to handle multi-byte characters correctly.
+fn truncate_to_width(s: &str, max_width: usize) -> String {
+    let width = s.width();
+    if width <= max_width {
+        return s.to_string();
+    }
+
+    // Need to truncate - leave room for ellipsis
+    let target_width = max_width.saturating_sub(1);
+    let mut current_width = 0;
+    let mut end_idx = 0;
+
+    for (idx, ch) in s.char_indices() {
+        let ch_width = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        if current_width + ch_width > target_width {
+            break;
+        }
+        current_width += ch_width;
+        end_idx = idx + ch.len_utf8();
+    }
+
+    format!("{}…", &s[..end_idx])
+}
 
 /// Build mode tabs (powerline capsules or plain brackets based on nerd_fonts setting)
 fn build_mode_tabs(active_mode: Mode, use_nerd_fonts: bool) -> Line<'static> {
@@ -240,11 +266,7 @@ fn format_json_list_item(
     max_width: usize,
 ) -> ListItem<'static> {
     // Truncate long names to fit available width
-    let display = if name.len() > max_width {
-        format!("{}…", &name[..max_width.saturating_sub(1)])
-    } else {
-        name.to_string()
-    };
+    let display = truncate_to_width(name, max_width);
 
     let num_style = if is_focused {
         Style::default().fg(Color::Blue)
@@ -345,11 +367,7 @@ fn format_path_list_item(
     };
 
     // Truncate long paths to fit available width
-    let display = if block.raw.len() > max_width {
-        format!("{}…", &block.raw[..max_width.saturating_sub(1)])
-    } else {
-        block.raw.clone()
-    };
+    let display = truncate_to_width(&block.raw, max_width);
 
     let num_style = if is_focused {
         Style::default().fg(Color::Magenta)
@@ -603,11 +621,7 @@ fn format_list_item(
     max_width: usize,
 ) -> ListItem<'static> {
     // Truncate long commands to fit available width
-    let display = if command.len() > max_width {
-        format!("{}…", &command[..max_width.saturating_sub(1)])
-    } else {
-        command.to_string()
-    };
+    let display = truncate_to_width(command, max_width);
 
     let num_style = if is_focused {
         Style::default().fg(Color::Green)
