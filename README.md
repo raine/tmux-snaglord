@@ -30,7 +30,7 @@ selectable block.
 - **Command blocks**: Each command and its output is a single selectable unit—no
   manual boundary selection
 - **Cross-pane workflow**: View history from any pane, paste back to where you
-  started. Switch source panes with `;` without restarting
+  started. Switch source panes with `;` or search all visible panes at once
 - **Three viewing modes** (Tab to switch):
   - **Commands**: Browse commands and their outputs
   - **JSON**: Auto-detects and extracts JSON with syntax highlighting
@@ -95,6 +95,7 @@ Options:
       --preset <NAME>     Preset pattern name (bash, zsh, fish, robbyrussell, starship, dollar, hash)
   -t, --target <PANE>     Target tmux pane (e.g., "%0", "session:window.pane", or "previous")
   -m, --mode <MODE>       Start in specific view mode [possible values: commands, json, paths]
+  -a, --all               Start in all-panes mode (search across all visible panes)
 ```
 
 The special target `previous` captures the last active pane, useful when you
@@ -131,13 +132,15 @@ want to run the tool from a different pane than the one you're inspecting.
 
 **Pane navigation**
 
-| Key | Action                                    |
-| --- | ----------------------------------------- |
-| `;` | Toggle between original and previous pane |
+| Key | Action                                             |
+| --- | -------------------------------------------------- |
+| `;` | Cycle pane source (this → previous → all)          |
+| `a` | Jump to all-panes mode                             |
 
-Use `;` to switch between viewing history from different panes without
-restarting. Paste actions (`p`/`P`) always target the original pane where the
-tool was launched.
+Use `;` to cycle between viewing history from the current pane, the previous
+pane, or all visible panes in the window. Press `a` to jump directly to
+all-panes mode. Paste actions (`p`/`P`) always target the original pane where
+the tool was launched.
 
 **Search mode**
 
