@@ -137,6 +137,15 @@ pub enum UpdateResult {
     Quit,
 }
 
+/// Type of content to retrieve from current selection
+#[derive(Clone, Copy)]
+pub enum ContentType {
+    /// Raw/minimal content (output for Commands, raw JSON, raw path with line:col)
+    Raw,
+    /// Full/enhanced content (cmd+output for Commands, pretty JSON, path only)
+    Full,
+}
+
 /// Main application state
 pub struct App {
     /// Current view mode
@@ -315,51 +324,15 @@ impl App {
             }
 
             Action::CopyOutput => {
-                match self.mode {
-                    Mode::Commands => {
-                        if let Some(output) = self.get_output_payload() {
-                            tmux::copy_to_clipboard(&output)?;
-                            return Ok(UpdateResult::Quit);
-                        }
-                    }
-                    Mode::Json => {
-                        // In JSON mode, y copies the raw (minified) JSON
-                        if let Some(block) = self.jsons.selected() {
-                            tmux::copy_to_clipboard(&block.raw)?;
-                            return Ok(UpdateResult::Quit);
-                        }
-                    }
-                    Mode::Paths => {
-                        // In Paths mode, y copies the raw match (path with line:col if present)
-                        if let Some(block) = self.paths.selected() {
-                            tmux::copy_to_clipboard(&block.raw)?;
-                            return Ok(UpdateResult::Quit);
-                        }
-                    }
+                if let Some(content) = self.get_content(ContentType::Raw) {
+                    tmux::copy_to_clipboard(&content)?;
+                    return Ok(UpdateResult::Quit);
                 }
             }
             Action::CopyFull => {
-                match self.mode {
-                    Mode::Commands => {
-                        if let Some(full) = self.get_full_payload() {
-                            tmux::copy_to_clipboard(&full)?;
-                            return Ok(UpdateResult::Quit);
-                        }
-                    }
-                    Mode::Json => {
-                        // In JSON mode, Y copies the pretty-printed JSON
-                        if let Some(block) = self.jsons.selected() {
-                            tmux::copy_to_clipboard(&block.pretty)?;
-                            return Ok(UpdateResult::Quit);
-                        }
-                    }
-                    Mode::Paths => {
-                        // In Paths mode, Y copies just the path (without line:col)
-                        if let Some(block) = self.paths.selected() {
-                            tmux::copy_to_clipboard(&block.path)?;
-                            return Ok(UpdateResult::Quit);
-                        }
-                    }
+                if let Some(content) = self.get_content(ContentType::Full) {
+                    tmux::copy_to_clipboard(&content)?;
+                    return Ok(UpdateResult::Quit);
                 }
             }
             Action::CopyCommand => {
@@ -394,27 +367,14 @@ impl App {
                 }
             }
             Action::Submit => {
-                match self.mode {
-                    Mode::Commands => {
-                        // Submit copies output only (same as y)
-                        if let Some(output) = self.get_output_payload() {
-                            tmux::copy_to_clipboard(&output)?;
-                            return Ok(UpdateResult::Quit);
-                        }
-                    }
-                    Mode::Json => {
-                        if let Some(block) = self.jsons.selected() {
-                            tmux::copy_to_clipboard(&block.pretty)?;
-                            return Ok(UpdateResult::Quit);
-                        }
-                    }
-                    Mode::Paths => {
-                        // Submit copies the raw match (same as y)
-                        if let Some(block) = self.paths.selected() {
-                            tmux::copy_to_clipboard(&block.raw)?;
-                            return Ok(UpdateResult::Quit);
-                        }
-                    }
+                // Submit copies: Raw for Commands/Paths, Full (pretty) for JSON
+                let content_type = match self.mode {
+                    Mode::Json => ContentType::Full,
+                    _ => ContentType::Raw,
+                };
+                if let Some(content) = self.get_content(content_type) {
+                    tmux::copy_to_clipboard(&content)?;
+                    return Ok(UpdateResult::Quit);
                 }
             }
             Action::SwitchMode => {
@@ -476,29 +436,15 @@ impl App {
                 }
             }
             Action::PasteOutput => {
-                // Paste output only (mirrors 'y' copy behavior)
-                // Always paste to original pane (where tool was launched), not the viewed pane
-                let payload = match self.mode {
-                    Mode::Commands => self.get_output_payload(),
-                    Mode::Json => self.jsons.selected().map(|b| b.raw.clone()),
-                    Mode::Paths => self.paths.selected().map(|b| b.raw.clone()),
-                };
-
-                if let Some(content) = payload {
+                // Paste raw content to original pane (where tool was launched)
+                if let Some(content) = self.get_content(ContentType::Raw) {
                     tmux::send_keys(&self.original_pane_id, &content)?;
                     return Ok(UpdateResult::Quit);
                 }
             }
             Action::PasteFull => {
-                // Paste command+output (mirrors 'Y' copy behavior)
-                // Always paste to original pane (where tool was launched), not the viewed pane
-                let payload = match self.mode {
-                    Mode::Commands => self.get_full_payload(),
-                    Mode::Json => self.jsons.selected().map(|b| b.pretty.clone()),
-                    Mode::Paths => self.paths.selected().map(|b| b.path.clone()),
-                };
-
-                if let Some(content) = payload {
+                // Paste full content to original pane (where tool was launched)
+                if let Some(content) = self.get_content(ContentType::Full) {
                     tmux::send_keys(&self.original_pane_id, &content)?;
                     return Ok(UpdateResult::Quit);
                 }
@@ -725,5 +671,29 @@ impl App {
             }
             out
         })
+    }
+
+    /// Get content from current selection based on mode and content type
+    fn get_content(&self, content_type: ContentType) -> Option<String> {
+        match self.mode {
+            Mode::Commands => match content_type {
+                ContentType::Raw => self.get_output_payload(),
+                ContentType::Full => self.get_full_payload(),
+            },
+            Mode::Json => {
+                let block = self.jsons.selected()?;
+                Some(match content_type {
+                    ContentType::Raw => block.raw.clone(),
+                    ContentType::Full => block.pretty.clone(),
+                })
+            }
+            Mode::Paths => {
+                let block = self.paths.selected()?;
+                Some(match content_type {
+                    ContentType::Raw => block.raw.clone(),
+                    ContentType::Full => block.path.clone(),
+                })
+            }
+        }
     }
 }
