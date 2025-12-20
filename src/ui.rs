@@ -127,6 +127,45 @@ fn highlight_text(
     spans
 }
 
+/// Build the standard list block with mode tabs and count indicator
+fn build_list_block(
+    mode: Mode,
+    use_nerd_fonts: bool,
+    view_source: ViewSource,
+    count_title: Line<'static>,
+) -> Block<'static> {
+    let mode_tabs = build_mode_tabs(mode, use_nerd_fonts, view_source);
+    Block::default()
+        .borders(Borders::RIGHT)
+        .border_style(Style::default().fg(Color::DarkGray))
+        .title_top(mode_tabs)
+        .title_top(count_title.alignment(Alignment::Right))
+}
+
+/// Build the count title "(X/Y)" for the list header
+fn build_count_title(selected_idx: Option<usize>, total: usize) -> Line<'static> {
+    if let Some(idx) = selected_idx {
+        Line::from(vec![Span::styled(
+            format!(" ({}/{}) ", idx + 1, total),
+            Style::default().fg(Color::DarkGray),
+        )])
+    } else {
+        Line::from(vec![])
+    }
+}
+
+/// Create a styled List widget with standard highlight settings
+fn styled_list(items: Vec<ListItem<'static>>, block: Block<'static>) -> List<'static> {
+    List::new(items)
+        .block(block)
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .bg(Color::DarkGray),
+        )
+        .highlight_symbol("▶ ")
+}
+
 /// Build mode tabs (powerline capsules or plain brackets based on nerd_fonts setting)
 fn build_mode_tabs(
     active_mode: Mode,
@@ -240,7 +279,6 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
             let block = &app.commands.items[real_idx];
             let is_focused = selected_idx == Some(visual_idx);
             let is_pinned = app.selection.contains(&real_idx);
-            // Retrieve match indices for this block (if any)
             let matches = app.match_indices.get(&real_idx);
             format_list_item(
                 visual_idx,
@@ -253,40 +291,18 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
         })
         .collect();
 
-    // Build title with mode tabs and count info
-    let mode_tabs = build_mode_tabs(Mode::Commands, app.nerd_fonts, app.view_source);
-
-    // Left title: shows selection count if items are pinned, otherwise "Commands (X/Y)"
-    let left_title = if !app.selection.is_empty() {
+    // Commands mode: show selection count if items are pinned, otherwise standard count
+    let count_title = if !app.selection.is_empty() {
         Line::from(vec![Span::styled(
             format!(" {} selected ", app.selection.len()),
             Style::default().fg(Color::Yellow),
         )])
-    } else if let Some(idx) = selected_idx {
-        Line::from(vec![Span::styled(
-            format!(" ({}/{}) ", idx + 1, app.commands.filtered_indices.len()),
-            Style::default().fg(Color::DarkGray),
-        )])
     } else {
-        Line::from(vec![])
+        build_count_title(selected_idx, app.commands.filtered_indices.len())
     };
 
-    // Build block with mode tabs and count
-    let block = Block::default()
-        .borders(Borders::RIGHT)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title_top(mode_tabs)
-        .title_top(left_title.alignment(Alignment::Right));
-
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(
-            Style::default()
-                .add_modifier(Modifier::BOLD)
-                .bg(Color::DarkGray),
-        )
-        .highlight_symbol("▶ ");
-
+    let block = build_list_block(Mode::Commands, app.nerd_fonts, app.view_source, count_title);
+    let list = styled_list(items, block);
     frame.render_stateful_widget(list, area, &mut app.commands.state);
 }
 
@@ -302,40 +318,15 @@ fn render_json_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rec
         .iter()
         .enumerate()
         .map(|(visual_idx, &real_idx)| {
-            let block = &app.jsons.items[real_idx];
+            let json_block = &app.jsons.items[real_idx];
             let is_focused = selected_idx == Some(visual_idx);
-            format_json_list_item(visual_idx, &block.name, is_focused, max_width)
+            format_json_list_item(visual_idx, &json_block.name, is_focused, max_width)
         })
         .collect();
 
-    // Build title with mode tabs
-    let mode_tabs = build_mode_tabs(Mode::Json, app.nerd_fonts, app.view_source);
-
-    // Count info
-    let count_title = if let Some(idx) = selected_idx {
-        Line::from(vec![Span::styled(
-            format!(" ({}/{}) ", idx + 1, app.jsons.filtered_indices.len()),
-            Style::default().fg(Color::DarkGray),
-        )])
-    } else {
-        Line::from(vec![])
-    };
-
-    let block = Block::default()
-        .borders(Borders::RIGHT)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title_top(mode_tabs)
-        .title_top(count_title.alignment(Alignment::Right));
-
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(
-            Style::default()
-                .add_modifier(Modifier::BOLD)
-                .bg(Color::DarkGray),
-        )
-        .highlight_symbol("▶ ");
-
+    let count_title = build_count_title(selected_idx, app.jsons.filtered_indices.len());
+    let block = build_list_block(Mode::Json, app.nerd_fonts, app.view_source, count_title);
+    let list = styled_list(items, block);
     frame.render_stateful_widget(list, area, &mut app.jsons.state);
 }
 
@@ -376,40 +367,15 @@ fn render_paths_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Re
         .iter()
         .enumerate()
         .map(|(visual_idx, &real_idx)| {
-            let block = &app.paths.items[real_idx];
+            let path_block = &app.paths.items[real_idx];
             let is_focused = selected_idx == Some(visual_idx);
-            format_path_list_item(visual_idx, block, is_focused, max_width, use_nerd_fonts)
+            format_path_list_item(visual_idx, path_block, is_focused, max_width, use_nerd_fonts)
         })
         .collect();
 
-    // Build title with mode tabs
-    let mode_tabs = build_mode_tabs(Mode::Paths, app.nerd_fonts, app.view_source);
-
-    // Count info
-    let count_title = if let Some(idx) = selected_idx {
-        Line::from(vec![Span::styled(
-            format!(" ({}/{}) ", idx + 1, app.paths.filtered_indices.len()),
-            Style::default().fg(Color::DarkGray),
-        )])
-    } else {
-        Line::from(vec![])
-    };
-
-    let block = Block::default()
-        .borders(Borders::RIGHT)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title_top(mode_tabs)
-        .title_top(count_title.alignment(Alignment::Right));
-
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(
-            Style::default()
-                .add_modifier(Modifier::BOLD)
-                .bg(Color::DarkGray),
-        )
-        .highlight_symbol("▶ ");
-
+    let count_title = build_count_title(selected_idx, app.paths.filtered_indices.len());
+    let block = build_list_block(Mode::Paths, app.nerd_fonts, app.view_source, count_title);
+    let list = styled_list(items, block);
     frame.render_stateful_widget(list, area, &mut app.paths.state);
 }
 
