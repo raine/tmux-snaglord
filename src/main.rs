@@ -19,7 +19,7 @@ mod ui;
 mod utils;
 
 use action::Action;
-use app::{App, UpdateResult};
+use app::{App, UpdateResult, ViewSource};
 
 #[derive(Parser)]
 #[command(name = "tmux-snaglord")]
@@ -55,6 +55,10 @@ struct RunArgs {
     /// Start in specific view mode
     #[arg(short, long, value_enum)]
     mode: Option<app::Mode>,
+
+    /// Search all visible panes in the window
+    #[arg(short, long)]
+    all: bool,
 }
 
 fn main() -> Result<()> {
@@ -137,20 +141,11 @@ fn run_tui(args: RunArgs) -> Result<()> {
         prompt_pattern
     ))?;
 
-    // Resolve target pane ID first (needed for both capture and paste)
+    // Resolve target pane ID (defaults to current pane)
     let target_pane_id = tmux::resolve_pane_id(args.target.as_deref())?;
 
-    // Capture tmux pane content
-    let content = tmux::capture_pane(&target_pane_id)?;
-
-    // Create app with content and prompt regex
-    let mut app = App::new(
-        &content,
-        prompt_re,
-        use_nerd_fonts,
-        prompt_pattern,
-        target_pane_id,
-    );
+    // Create app (loads content from pane internally)
+    let mut app = App::new(prompt_re, use_nerd_fonts, prompt_pattern, target_pane_id);
 
     // Setup terminal
     enable_raw_mode()?;
@@ -162,6 +157,12 @@ fn run_tui(args: RunArgs) -> Result<()> {
     // Apply the requested mode if present
     if let Some(mode) = args.mode {
         app.mode = mode;
+    }
+
+    // Apply all-panes view if requested
+    if args.all {
+        app.view_source = ViewSource::All;
+        app.load_content()?;
     }
 
     let res = run_app(&mut terminal, &mut app);
@@ -244,6 +245,8 @@ fn get_action(key: KeyEvent, app: &App) -> Option<Action> {
 
         // Toggle between original and previous pane
         KeyCode::Char(';') => Some(Action::TogglePreviousPane),
+        // Jump directly to all panes view
+        KeyCode::Char('a') => Some(Action::SwitchToAllPanes),
 
         KeyCode::Esc => {
             if !app.search_query.is_empty() {

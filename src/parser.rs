@@ -18,6 +18,8 @@ pub struct CommandBlock {
     pub command_text: String,
     /// The output following the command
     pub output: String,
+    /// The pane ID this command came from (for multi-pane mode)
+    pub pane_id: String,
 }
 
 /// A block representing a detected JSON object
@@ -188,6 +190,7 @@ fn build_block(
         clean_command: String::from_utf8_lossy(&clean_bytes).into_owned(),
         command_text,
         output: filtered_output.join("\n"),
+        pane_id: String::new(), // Set by caller after parsing
     }
 }
 

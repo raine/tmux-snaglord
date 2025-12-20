@@ -23,6 +23,17 @@ pub enum Mode {
     Paths,
 }
 
+/// Source of pane content being viewed
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewSource {
+    /// Viewing the original pane where the tool was launched
+    Original,
+    /// Viewing the previous (last active) pane
+    Previous,
+    /// Viewing aggregated content from all visible panes
+    All,
+}
+
 /// Result of processing an action
 pub enum UpdateResult {
     /// Continue running the application
@@ -82,20 +93,21 @@ pub struct App {
     /// Transient error message to display in UI
     pub error_msg: Option<String>,
 
-    /// ID of the tmux pane to paste into (current view)
-    pub target_pane_id: String,
-    /// ID of the original pane where the app started
+    /// Current view source (original, previous, or all panes)
+    pub view_source: ViewSource,
+    /// ID of the original pane where the app started (paste target)
     pub original_pane_id: String,
 }
 
 impl App {
-    /// Create a new App with the given content, prompt regex, and pattern string
+    /// Create a new App with the given prompt regex and pattern string
+    ///
+    /// The app will load content from the original pane on creation.
     pub fn new(
-        content: &str,
         prompt_re: Regex,
         nerd_fonts: bool,
         prompt_pattern: String,
-        target_pane_id: String,
+        original_pane_id: String,
     ) -> Self {
         let mut app = Self {
             mode: Mode::Commands,
@@ -116,18 +128,56 @@ impl App {
             is_searching: false,
             prompt_re,
             error_msg: None,
-            original_pane_id: target_pane_id.clone(),
-            target_pane_id,
+            view_source: ViewSource::Original,
+            original_pane_id,
         };
 
-        app.ingest_content(content);
+        // Load initial content from original pane
+        let _ = app.load_content();
         app
     }
 
-    /// Parse content and populate/reset all state
-    fn ingest_content(&mut self, content: &str) {
-        // Parse into command blocks
-        self.blocks = parse_history(content, &self.prompt_re);
+    /// Load content based on current view_source
+    pub fn load_content(&mut self) -> Result<()> {
+        self.blocks.clear();
+
+        match self.view_source {
+            ViewSource::Original => {
+                self.ingest_pane(&self.original_pane_id.clone())?;
+            }
+            ViewSource::Previous => {
+                let prev = tmux::resolve_pane_id(Some("previous"))?;
+                self.ingest_pane(&prev)?;
+            }
+            ViewSource::All => {
+                let panes = tmux::list_panes()?;
+                for pane_id in panes {
+                    // Ignore errors for individual panes so one failure doesn't break the app
+                    let _ = self.ingest_pane(&pane_id);
+                }
+            }
+        }
+
+        self.finalize_ingestion();
+        Ok(())
+    }
+
+    /// Capture and parse a specific pane, appending to blocks
+    fn ingest_pane(&mut self, pane_id: &str) -> Result<()> {
+        let content = tmux::capture_pane(pane_id)?;
+        let mut new_blocks = parse_history(&content, &self.prompt_re);
+
+        // Tag each block with its source pane
+        for block in &mut new_blocks {
+            block.pane_id = pane_id.to_string();
+        }
+
+        self.blocks.append(&mut new_blocks);
+        Ok(())
+    }
+
+    /// Finalize state after loading blocks (indices, JSON, paths, etc.)
+    fn finalize_ingestion(&mut self) {
         self.list_state = ListState::default();
         if !self.blocks.is_empty() {
             self.list_state.select(Some(0));
@@ -158,15 +208,6 @@ impl App {
         if !self.search_query.is_empty() {
             self.update_search_results();
         }
-    }
-
-    /// Capture content from a specific pane and reload the app state
-    fn reload_from_pane(&mut self, target: &str) -> Result<()> {
-        let pane_id = tmux::resolve_pane_id(Some(target))?;
-        let content = tmux::capture_pane(&pane_id)?;
-        self.ingest_content(&content);
-        self.target_pane_id = pane_id;
-        Ok(())
     }
 
     /// Process an action and update application state
@@ -342,14 +383,27 @@ impl App {
                 self.update_search_results();
             }
             Action::TogglePreviousPane => {
-                if self.target_pane_id == self.original_pane_id {
-                    if let Err(e) = self.reload_from_pane("previous") {
-                        self.error_msg = Some(format!("Failed to load previous pane: {}", e));
-                    }
-                } else {
-                    let original = self.original_pane_id.clone();
-                    if let Err(e) = self.reload_from_pane(&original) {
-                        self.error_msg = Some(format!("Failed to restore original pane: {}", e));
+                // Cycle: Original -> Previous -> All -> Original
+                self.view_source = match self.view_source {
+                    ViewSource::Original => ViewSource::Previous,
+                    ViewSource::Previous => ViewSource::All,
+                    ViewSource::All => ViewSource::Original,
+                };
+
+                if let Err(e) = self.load_content() {
+                    self.error_msg = Some(format!("Failed to load content: {}", e));
+                    // Fallback to original on error
+                    self.view_source = ViewSource::Original;
+                    let _ = self.load_content();
+                }
+            }
+            Action::SwitchToAllPanes => {
+                if self.view_source != ViewSource::All {
+                    self.view_source = ViewSource::All;
+                    if let Err(e) = self.load_content() {
+                        self.error_msg = Some(format!("Failed to load all panes: {}", e));
+                        self.view_source = ViewSource::Original;
+                        let _ = self.load_content();
                     }
                 }
             }

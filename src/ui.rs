@@ -1,7 +1,6 @@
 //! TUI rendering logic
 
 use ansi_to_tui::IntoText;
-use unicode_width::UnicodeWidthStr;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout},
@@ -10,8 +9,9 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph},
 };
 use serde_json::Value;
+use unicode_width::UnicodeWidthStr;
 
-use crate::app::{App, Mode};
+use crate::app::{App, Mode, ViewSource};
 use crate::parser::PathType;
 
 /// Powerline glyphs for capsule-style tabs
@@ -44,7 +44,11 @@ fn truncate_to_width(s: &str, max_width: usize) -> String {
 }
 
 /// Build mode tabs (powerline capsules or plain brackets based on nerd_fonts setting)
-fn build_mode_tabs(active_mode: Mode, use_nerd_fonts: bool) -> Line<'static> {
+fn build_mode_tabs(
+    active_mode: Mode,
+    use_nerd_fonts: bool,
+    view_source: ViewSource,
+) -> Line<'static> {
     let tabs = [
         ("Commands", Color::Green, Mode::Commands),
         ("Paths", Color::Magenta, Mode::Paths),
@@ -89,6 +93,22 @@ fn build_mode_tabs(active_mode: Mode, use_nerd_fonts: bool) -> Line<'static> {
             spans.push(Span::raw(" "));
         }
     }
+
+    // Add view source indicator
+    let (source_label, source_color) = match view_source {
+        ViewSource::Original => ("THIS", Color::Green),
+        ViewSource::Previous => ("PREV", Color::Yellow),
+        ViewSource::All => ("ALL", Color::Cyan),
+    };
+    spans.push(Span::raw("  "));
+    // Simple tag style: muted bg with colored text
+    spans.push(Span::styled(
+        format!(" {} ", source_label),
+        Style::default()
+            .fg(source_color)
+            .bg(Color::Rgb(50, 50, 50))
+            .add_modifier(Modifier::BOLD),
+    ));
 
     Line::from(spans)
 }
@@ -146,7 +166,7 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
         .collect();
 
     // Build title with mode tabs and count info
-    let mode_tabs = build_mode_tabs(Mode::Commands, app.nerd_fonts);
+    let mode_tabs = build_mode_tabs(Mode::Commands, app.nerd_fonts, app.view_source);
 
     // Left title: shows selection count if items are pinned, otherwise "Commands (X/Y)"
     let left_title = if !app.selection.is_empty() {
@@ -214,7 +234,7 @@ fn render_json_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rec
         .collect();
 
     // Build title with mode tabs
-    let mode_tabs = build_mode_tabs(Mode::Json, app.nerd_fonts);
+    let mode_tabs = build_mode_tabs(Mode::Json, app.nerd_fonts, app.view_source);
 
     // Count info
     let count_title = if let Some(idx) = selected_idx {
@@ -301,7 +321,7 @@ fn render_paths_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Re
         .collect();
 
     // Build title with mode tabs
-    let mode_tabs = build_mode_tabs(Mode::Paths, app.nerd_fonts);
+    let mode_tabs = build_mode_tabs(Mode::Paths, app.nerd_fonts, app.view_source);
 
     // Count info
     let count_title = if let Some(idx) = selected_idx {

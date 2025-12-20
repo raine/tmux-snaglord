@@ -49,6 +49,8 @@ pub enum Action {
     SwitchToPaths,
     /// Toggle between the original pane and the previous tmux pane
     TogglePreviousPane,
+    /// Switch directly to all panes view
+    SwitchToAllPanes,
     /// Paste output to target pane (send-keys)
     PasteOutput,
     /// Paste command+output to target pane (send-keys)

@@ -118,6 +118,30 @@ pub fn send_keys(pane_id: &str, content: &str) -> Result<()> {
     Ok(())
 }
 
+/// List all pane IDs in the current tmux window
+///
+/// Returns a vector of pane IDs (e.g., ["%0", "%1", "%2"])
+pub fn list_panes() -> Result<Vec<String>> {
+    let output = Command::new("tmux")
+        .args(["list-panes", "-F", "#{pane_id}"])
+        .output()
+        .context("Failed to execute tmux list-panes")?;
+
+    if !output.status.success() {
+        anyhow::bail!(
+            "tmux list-panes failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let out = String::from_utf8(output.stdout).context("tmux output contained invalid UTF-8")?;
+    Ok(out
+        .lines()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.trim().to_string())
+        .collect())
+}
+
 /// Copy content to system clipboard (macOS pbcopy)
 pub fn copy_to_clipboard(content: &str) -> Result<()> {
     let mut child = Command::new("pbcopy")
