@@ -287,9 +287,9 @@ impl App {
             Action::Submit => {
                 match self.mode {
                     Mode::Commands => {
-                        // Submit copies full content (command + output), same as Y
-                        if let Some(full) = self.get_full_payload() {
-                            tmux::copy_to_clipboard(&full)?;
+                        // Submit copies output only (same as y)
+                        if let Some(output) = self.get_output_payload() {
+                            tmux::copy_to_clipboard(&output)?;
                             return Ok(UpdateResult::Quit);
                         }
                     }
