@@ -43,6 +43,90 @@ fn truncate_to_width(s: &str, max_width: usize) -> String {
     format!("{}…", &s[..end_idx])
 }
 
+/// Highlight matched characters in text and truncate to fit width.
+/// Returns a vector of styled spans with matched characters highlighted.
+fn highlight_text(
+    text: &str,
+    matches: Option<&Vec<usize>>,
+    base_style: Style,
+    highlight_style: Style,
+    max_width: usize,
+) -> Vec<Span<'static>> {
+    let width = text.width();
+
+    // If no matches and fits in width, return single span
+    if matches.is_none() && width <= max_width {
+        return vec![Span::styled(text.to_string(), base_style)];
+    }
+
+    let mut spans = Vec::new();
+    let mut current_width = 0;
+    // Reserve space for ellipsis if truncation is needed
+    let target_width = if width > max_width {
+        max_width.saturating_sub(1)
+    } else {
+        max_width
+    };
+
+    // Buffer for adjacent characters with same style
+    let mut pending_chars = String::new();
+    let mut pending_is_highlight = false;
+
+    // Helper closure to flush buffer
+    let flush =
+        |chars: &mut String, is_highlight: bool, output: &mut Vec<Span<'static>>, hl, base| {
+            if !chars.is_empty() {
+                let style = if is_highlight { hl } else { base };
+                output.push(Span::styled(std::mem::take(chars), style));
+            }
+        };
+
+    for (byte_idx, ch) in text.char_indices() {
+        let ch_width = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+
+        // Check for truncation
+        if current_width + ch_width > target_width {
+            flush(
+                &mut pending_chars,
+                pending_is_highlight,
+                &mut spans,
+                highlight_style,
+                base_style,
+            );
+            spans.push(Span::styled("…", base_style));
+            return spans;
+        }
+
+        // Binary search is O(log n), faster than HashSet build O(n) in render loop
+        let is_match = matches.map_or(false, |m| m.binary_search(&byte_idx).is_ok());
+
+        // State change: flush buffer
+        if is_match != pending_is_highlight {
+            flush(
+                &mut pending_chars,
+                pending_is_highlight,
+                &mut spans,
+                highlight_style,
+                base_style,
+            );
+            pending_is_highlight = is_match;
+        }
+
+        pending_chars.push(ch);
+        current_width += ch_width;
+    }
+
+    // Flush remaining
+    flush(
+        &mut pending_chars,
+        pending_is_highlight,
+        &mut spans,
+        highlight_style,
+        base_style,
+    );
+    spans
+}
+
 /// Build mode tabs (powerline capsules or plain brackets based on nerd_fonts setting)
 fn build_mode_tabs(
     active_mode: Mode,
@@ -155,12 +239,15 @@ fn render_command_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::
             let block = &app.blocks[real_idx];
             let is_focused = selected_idx == Some(visual_idx);
             let is_pinned = app.selection.contains(&real_idx);
+            // Retrieve match indices for this block (if any)
+            let matches = app.match_indices.get(&real_idx);
             format_list_item(
                 visual_idx,
                 &block.clean_command,
                 is_focused,
                 is_pinned,
                 max_width,
+                matches,
             )
         })
         .collect();
@@ -632,36 +719,46 @@ fn render_help_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     frame.render_widget(paragraph, area);
 }
 
-/// Format a single list item with consistent styling
+/// Format a single list item with consistent styling and optional match highlighting
 fn format_list_item(
     index: usize,
     command: &str,
     is_focused: bool,
     is_pinned: bool,
     max_width: usize,
+    matches: Option<&Vec<usize>>,
 ) -> ListItem<'static> {
-    // Truncate long commands to fit available width
-    let display = truncate_to_width(command, max_width);
-
     let num_style = if is_focused {
         Style::default().fg(Color::Green)
     } else {
         Style::default().fg(Color::DarkGray)
     };
 
-    let cmd_style = if is_pinned {
+    let base_cmd_style = if is_pinned {
         Style::default().fg(Color::Yellow)
     } else {
         Style::default().fg(Color::White)
     };
 
+    // Highlight style: light green (similar to fzf) for matched characters
+    let highlight_style = Style::default()
+        .fg(Color::LightGreen)
+        .add_modifier(Modifier::BOLD);
+
     let marker = if is_pinned { "* " } else { "  " };
 
-    ListItem::new(Line::from(vec![
+    // Generate highlighted spans for the command text
+    let command_spans = highlight_text(command, matches, base_cmd_style, highlight_style, max_width);
+
+    let mut line_spans = vec![
         Span::styled(format!("{:3}", index + 1), num_style),
         Span::styled(marker, Style::default().fg(Color::Yellow)),
-        Span::styled(display, cmd_style),
-    ]))
+    ];
+
+    // Append the highlighted text spans
+    line_spans.extend(command_spans);
+
+    ListItem::new(Line::from(line_spans))
 }
 
 // === Path Display ===

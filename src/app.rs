@@ -1,5 +1,7 @@
 //! Application state management
 
+use std::collections::HashMap;
+
 use anyhow::Result;
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -77,6 +79,10 @@ pub struct App {
     /// Indices of path blocks that match the current filter
     pub path_filtered_indices: Vec<usize>,
 
+    // Search highlighting
+    /// Maps block index -> byte indices of matched characters (for Commands mode)
+    pub match_indices: HashMap<usize, Vec<usize>>,
+
     // Shared state
     /// Vertical scroll offset for the output pane
     pub scroll_offset: u16,
@@ -123,6 +129,7 @@ impl App {
             path_blocks: Vec::new(),
             path_list_state: ListState::default(),
             path_filtered_indices: Vec::new(),
+            match_indices: HashMap::new(),
             scroll_offset: 0,
             search_query: String::new(),
             is_searching: false,
@@ -183,6 +190,7 @@ impl App {
             self.list_state.select(Some(0));
         }
         self.filtered_indices = (0..self.blocks.len()).collect();
+        self.match_indices.clear();
         self.selection.clear();
 
         // Parse JSONs from command outputs
@@ -581,6 +589,9 @@ impl App {
 
     /// Update filtered results based on current search query
     fn update_search_results(&mut self) {
+        // Clear previous match indices
+        self.match_indices.clear();
+
         match self.mode {
             Mode::Commands => {
                 if self.search_query.is_empty() {
@@ -592,14 +603,25 @@ impl App {
                         .iter()
                         .enumerate()
                         .filter_map(|(idx, block)| {
-                            let cmd_score =
-                                matcher.fuzzy_match(&block.clean_command, &self.search_query);
+                            // Use fuzzy_indices to get both score and match positions
+                            let cmd_result =
+                                matcher.fuzzy_indices(&block.clean_command, &self.search_query);
                             let clean_output = strip_ansi(&block.output);
                             let out_score = matcher.fuzzy_match(&clean_output, &self.search_query);
-                            match (cmd_score, out_score) {
-                                (Some(c), Some(o)) => Some((c.max(o), idx)),
-                                (Some(c), None) => Some((c, idx)),
-                                (None, Some(o)) => Some((o, idx)),
+
+                            match (cmd_result, out_score) {
+                                (Some((c_score, c_indices)), Some(o_score)) => {
+                                    self.match_indices.insert(idx, c_indices);
+                                    Some((c_score.max(o_score), idx))
+                                }
+                                (Some((c_score, c_indices)), None) => {
+                                    self.match_indices.insert(idx, c_indices);
+                                    Some((c_score, idx))
+                                }
+                                (None, Some(o_score)) => {
+                                    // Output matched but not command - no highlighting
+                                    Some((o_score, idx))
+                                }
                                 (None, None) => None,
                             }
                         })
