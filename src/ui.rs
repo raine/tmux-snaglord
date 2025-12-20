@@ -369,7 +369,13 @@ fn render_paths_list(frame: &mut Frame, app: &mut App, area: ratatui::layout::Re
         .map(|(visual_idx, &real_idx)| {
             let path_block = &app.paths.items[real_idx];
             let is_focused = selected_idx == Some(visual_idx);
-            format_path_list_item(visual_idx, path_block, is_focused, max_width, use_nerd_fonts)
+            format_path_list_item(
+                visual_idx,
+                path_block,
+                is_focused,
+                max_width,
+                use_nerd_fonts,
+            )
         })
         .collect();
 
@@ -675,7 +681,8 @@ fn format_list_item(
     let marker = if is_pinned { "* " } else { "  " };
 
     // Generate highlighted spans for the command text
-    let command_spans = highlight_text(command, matches, base_cmd_style, highlight_style, max_width);
+    let command_spans =
+        highlight_text(command, matches, base_cmd_style, highlight_style, max_width);
 
     let mut line_spans = vec![
         Span::styled(format!("{:3}", index + 1), num_style),

@@ -1,8 +1,7 @@
 //! Interface for tmux commands
 
 use anyhow::{Context, Result};
-use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 /// Special target identifier for the previous (last active) pane
 const PREVIOUS_PANE_TARGET: &str = "previous";
@@ -142,23 +141,11 @@ pub fn list_panes() -> Result<Vec<String>> {
         .collect())
 }
 
-/// Copy content to system clipboard (macOS pbcopy)
+/// Copy content to system clipboard (cross-platform)
 pub fn copy_to_clipboard(content: &str) -> Result<()> {
-    let mut child = Command::new("pbcopy")
-        .stdin(Stdio::piped())
-        .spawn()
-        .context("Failed to spawn pbcopy")?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(content.as_bytes())
-            .context("Failed to write to pbcopy stdin")?;
-    }
-
-    let status = child.wait().context("Failed to wait for pbcopy")?;
-    if !status.success() {
-        anyhow::bail!("pbcopy exited with non-zero status");
-    }
-
+    let mut clipboard = arboard::Clipboard::new().context("Failed to access clipboard")?;
+    clipboard
+        .set_text(content)
+        .context("Failed to copy to clipboard")?;
     Ok(())
 }

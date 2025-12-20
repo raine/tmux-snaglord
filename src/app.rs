@@ -20,11 +20,19 @@ use crate::utils::{escape_debug, strip_ansi};
 /// Trait for items that can be fuzzy searched
 pub trait FuzzySearchable {
     /// Returns (score, optional match indices) if the item matches the query
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<(i64, Option<Vec<usize>>)>;
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> Option<(i64, Option<Vec<usize>>)>;
 }
 
 impl FuzzySearchable for CommandBlock {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<(i64, Option<Vec<usize>>)> {
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> Option<(i64, Option<Vec<usize>>)> {
         let cmd_result = matcher.fuzzy_indices(&self.clean_command, query);
         let clean_output = strip_ansi(&self.output);
         let out_score = matcher.fuzzy_match(&clean_output, query);
@@ -41,7 +49,11 @@ impl FuzzySearchable for CommandBlock {
 }
 
 impl FuzzySearchable for JsonBlock {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<(i64, Option<Vec<usize>>)> {
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> Option<(i64, Option<Vec<usize>>)> {
         let name_score = matcher.fuzzy_match(&self.name, query);
         let raw_score = matcher.fuzzy_match(&self.raw, query);
 
@@ -55,7 +67,11 @@ impl FuzzySearchable for JsonBlock {
 }
 
 impl FuzzySearchable for PathBlock {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<(i64, Option<Vec<usize>>)> {
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> Option<(i64, Option<Vec<usize>>)> {
         let path_score = matcher.fuzzy_match(&self.path, query);
         let raw_score = matcher.fuzzy_match(&self.raw, query);
 
