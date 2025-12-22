@@ -68,7 +68,8 @@ pub fn resolve_pane_id(target: Option<&str>) -> Result<String> {
 /// - `-e`: preserve escape sequences (ANSI colors)
 /// - `-J`: join wrapped lines
 /// - `-p`: output to stdout
-/// - `-S -5000`: capture last 5000 lines (not full history, which includes stale content)
+/// - `-S -`: start from the beginning of scrollback history
+/// - `-E -`: end at the last line (ensures we capture everything including content below cursor)
 ///
 /// The `pane_id` should be a resolved pane ID (e.g., "%0") from `resolve_pane_id`.
 pub fn capture_pane(pane_id: &str) -> Result<String> {
@@ -78,7 +79,9 @@ pub fn capture_pane(pane_id: &str) -> Result<String> {
         "-J",
         "-p",
         "-S",
-        "-5000",
+        "-",
+        "-E",
+        "-",
         "-t",
         pane_id,
     ];
