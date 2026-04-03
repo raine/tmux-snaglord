@@ -16,7 +16,7 @@ scrollback into a structured, searchable list of commands and their outputs.
 [Install](#install) · [Quick start](#quick-start) · [Usage](#usage) ·
 [Configuration](#configuration)
 
-![Demo](meta/demo.gif)
+<video src="https://github.com/user-attachments/assets/a3e3db87-89da-4026-9733-fbdc588241b0" autoplay loop muted></video>
 
 ### Why not tmux copy-mode?
 
