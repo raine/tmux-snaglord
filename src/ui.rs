@@ -3,7 +3,7 @@
 use ansi_to_tui::IntoText;
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Cell, Clear, List, ListItem, Paragraph, Row, Table},
@@ -135,13 +135,12 @@ fn build_list_block(
     view_source: ViewSource,
     count_title: Line<'static>,
 ) -> Block<'static> {
-    let mut mode_tabs = build_mode_tabs(mode, use_nerd_fonts, view_source);
-    // Append count to the tabs line so they don't overlap on narrow panes
-    mode_tabs.spans.extend(count_title.spans);
+    let mode_tabs = build_mode_tabs(mode, use_nerd_fonts, view_source);
     Block::default()
         .borders(Borders::RIGHT)
         .border_style(Style::default().fg(Color::DarkGray))
         .title_top(mode_tabs)
+        .title_top(count_title.alignment(Alignment::Right))
 }
 
 /// Build the count title "(X/Y)" for the list header
@@ -225,7 +224,7 @@ fn build_mode_tabs(
         ViewSource::Previous => ("PREV", Color::Yellow),
         ViewSource::All => ("ALL", Color::Cyan),
     };
-    spans.push(Span::raw("  "));
+    spans.push(Span::raw(" "));
     // Simple tag style: muted bg with colored text
     spans.push(Span::styled(
         format!(" {} ", source_label),
