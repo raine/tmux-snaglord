@@ -186,7 +186,7 @@ fn build_mode_tabs(
 
         if i > 0 {
             // Add spacing between tabs
-            spans.push(Span::raw("  "));
+            spans.push(Span::raw(" "));
         }
 
         if is_active {
