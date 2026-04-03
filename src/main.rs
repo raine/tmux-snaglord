@@ -192,6 +192,11 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
 
 /// Map a key event to an action based on current application state
 fn get_action(key: KeyEvent, app: &App) -> Option<Action> {
+    // Help overlay: any key dismisses it
+    if app.show_help {
+        return Some(Action::DismissHelp);
+    }
+
     // Tab switches modes (available in both search and normal mode)
     if key.code == KeyCode::Tab {
         return Some(Action::SwitchMode);
@@ -281,6 +286,7 @@ fn get_action(key: KeyEvent, app: &App) -> Option<Action> {
         KeyCode::Char('D') => Some(Action::CopyDebug),
         KeyCode::Char('p') => Some(Action::PasteOutput),
         KeyCode::Char('P') => Some(Action::PasteFull),
+        KeyCode::Char('?') => Some(Action::ShowHelp),
 
         _ => None,
     }

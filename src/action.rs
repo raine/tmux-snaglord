@@ -55,4 +55,8 @@ pub enum Action {
     PasteOutput,
     /// Paste command+output to target pane (send-keys)
     PasteFull,
+    /// Show/toggle help overlay
+    ShowHelp,
+    /// Dismiss help overlay (any key)
+    DismissHelp,
 }

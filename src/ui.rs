@@ -3,10 +3,10 @@
 use ansi_to_tui::IntoText;
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, Cell, Clear, List, ListItem, Paragraph, Row, Table},
 };
 
 use serde_json::Value;
@@ -254,6 +254,10 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     render_list_pane(frame, app, chunks[0]);
     render_output_pane(frame, app, chunks[1]);
     render_footer(frame, app, vertical[1]);
+
+    if app.show_help {
+        render_help_overlay(frame, app);
+    }
 }
 
 /// Render the left list pane based on current mode
@@ -620,6 +624,132 @@ fn render_help_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         ),
     ]));
     frame.render_widget(help_key, footer_layout[1]);
+}
+
+/// Dim the entire frame buffer for modal overlays
+fn dim_buffer(f: &mut Frame) {
+    let area = f.area();
+    let buf = f.buffer_mut();
+    for y in area.top()..area.bottom() {
+        for x in area.left()..area.right() {
+            let cell = &mut buf[(x, y)];
+            cell.set_style(Style::default().fg(Color::DarkGray));
+        }
+    }
+}
+
+/// Help keybinding rows for each mode
+fn help_rows(mode: Mode) -> Vec<(&'static str, &'static str)> {
+    let mut rows = vec![
+        ("1-3", "Switch mode"),
+        (";", "Toggle previous pane"),
+        ("a", "All panes view"),
+        ("/", "Search"),
+        ("j/k", "Navigate"),
+        ("Ctrl+d/u", "Scroll output"),
+    ];
+
+    match mode {
+        Mode::Commands => {
+            rows.extend([
+                ("spc", "Pin to scratchpad"),
+                ("Enter", "Copy pinned / selected"),
+                ("y", "Copy output"),
+                ("Y", "Copy command + output"),
+                ("c", "Copy command"),
+                ("p", "Paste output"),
+                ("P", "Paste command + output"),
+            ]);
+        }
+        Mode::Json => {
+            rows.extend([
+                ("y", "Copy raw JSON"),
+                ("Y", "Copy pretty JSON"),
+                ("p", "Paste raw JSON"),
+                ("P", "Paste pretty JSON"),
+            ]);
+        }
+        Mode::Paths => {
+            rows.extend([
+                ("y", "Copy full path"),
+                ("Y", "Copy path only"),
+                ("p", "Paste full path"),
+                ("P", "Paste path only"),
+            ]);
+        }
+    }
+
+    rows.extend([("Esc", "Clear / quit"), ("q", "Quit")]);
+    rows
+}
+
+/// Render centered help overlay
+fn render_help_overlay(frame: &mut Frame, app: &App) {
+    dim_buffer(frame);
+
+    let keybindings = help_rows(app.mode);
+    let row_count = keybindings.len() as u16;
+    let height = row_count + 5; // borders + padding + empty line + footer
+    let width: u16 = 44;
+
+    let area = frame.area();
+    let popup_area = Rect {
+        x: area.width.saturating_sub(width) / 2,
+        y: area.height.saturating_sub(height) / 2,
+        width: width.min(area.width),
+        height: height.min(area.height),
+    };
+
+    let title = match app.mode {
+        Mode::Commands => "Commands",
+        Mode::Json => "JSON",
+        Mode::Paths => "Paths",
+    };
+
+    let block = Block::bordered()
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .border_style(Style::default().fg(Color::DarkGray))
+        .title(Line::from(vec![
+            Span::raw(" "),
+            Span::styled(
+                title,
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" "),
+        ]))
+        .title_bottom(Line::from(vec![
+            Span::raw(" "),
+            Span::styled("any key", Style::default().fg(Color::DarkGray)),
+            Span::styled(" to close ", Style::default().fg(Color::DarkGray)),
+        ]));
+
+    let mut rows: Vec<Row> = vec![Row::new(vec![Cell::from(""), Cell::from("")])];
+    rows.extend(keybindings.into_iter().map(|(key, desc)| {
+        Row::new(vec![
+            Cell::from(Line::from(vec![
+                Span::raw(" "),
+                Span::styled(
+                    format!("{:>10}", key),
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ])),
+            Cell::from(Line::from(vec![
+                Span::styled(" · ", Style::default().fg(Color::DarkGray)),
+                Span::styled(desc, Style::default().fg(Color::White)),
+            ])),
+        ])
+    }));
+
+    let table = Table::new(rows, [Constraint::Length(12), Constraint::Min(25)])
+        .block(block)
+        .column_spacing(0);
+
+    frame.render_widget(Clear, popup_area);
+    frame.render_widget(table, popup_area);
 }
 
 /// Format a single list item with consistent styling and optional match highlighting

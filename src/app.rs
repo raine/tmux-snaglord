@@ -282,6 +282,9 @@ pub struct App {
     /// Transient error message to display in UI
     pub error_msg: Option<String>,
 
+    /// Whether to show the help overlay
+    pub show_help: bool,
+
     /// Current view source (original, previous, or all panes)
     pub view_source: ViewSource,
     /// ID of the original pane where the app started (paste target)
@@ -312,6 +315,7 @@ impl App {
             is_searching: false,
             prompt_re,
             error_msg: None,
+            show_help: false,
             view_source: ViewSource::Original,
             original_pane_id,
         };
@@ -388,6 +392,14 @@ impl App {
         self.error_msg = None;
 
         match action {
+            Action::DismissHelp => {
+                self.show_help = false;
+                return Ok(UpdateResult::Continue);
+            }
+            Action::ShowHelp => {
+                self.show_help = !self.show_help;
+                return Ok(UpdateResult::Continue);
+            }
             Action::Quit => return Ok(UpdateResult::Quit),
 
             Action::Next => self.next(),
