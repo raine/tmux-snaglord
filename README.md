@@ -4,7 +4,7 @@
   <p>Reign over your tmux scrollback.</p>
 </div>
 
-Stop scrolling through walls of terminal text. `tmux-snaglord` turns your tmux
+Stop fumbling with tmux copy mode. `tmux-snaglord` turns your tmux
 scrollback into a structured, searchable list of commands and their outputs.
 
 - **Find** any command or output instantly with fuzzy search
