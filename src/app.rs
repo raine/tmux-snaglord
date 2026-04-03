@@ -15,7 +15,7 @@ use crate::parser::{
     CommandBlock, JsonBlock, PathBlock, find_json_candidates, find_path_candidates, parse_history,
 };
 use crate::tmux;
-use crate::utils::{escape_debug, strip_ansi};
+use crate::utils::escape_debug;
 
 /// Trait for items that can be fuzzy searched
 pub trait FuzzySearchable {
@@ -34,8 +34,7 @@ impl FuzzySearchable for CommandBlock {
         matcher: &SkimMatcherV2,
     ) -> Option<(i64, Option<Vec<usize>>)> {
         let cmd_result = matcher.fuzzy_indices(&self.command_text, query);
-        let clean_output = strip_ansi(&self.output);
-        let out_score = matcher.fuzzy_match(&clean_output, query);
+        let out_score = matcher.fuzzy_match(&self.clean_output, query);
 
         match (cmd_result, out_score) {
             (Some((c_score, indices)), Some(o_score)) => {
@@ -663,7 +662,7 @@ impl App {
 
     /// Get output payload (handles both single and batch selection)
     fn get_output_payload(&self) -> Option<String> {
-        self.resolve_payload(|b| strip_ansi(&b.output))
+        self.resolve_payload(|b| b.clean_output.clone())
     }
 
     /// Get command payload (handles both single and batch selection)
@@ -673,7 +672,7 @@ impl App {
 
     /// Get full payload (handles both single and batch selection)
     fn get_full_payload(&self) -> Option<String> {
-        self.resolve_payload(|b| format!("{}\n{}", strip_ansi(&b.command), strip_ansi(&b.output)))
+        self.resolve_payload(|b| format!("{}\n{}", b.clean_command, b.clean_output))
     }
 
     /// Get debug-formatted output for diagnosing parsing issues

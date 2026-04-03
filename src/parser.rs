@@ -18,6 +18,8 @@ pub struct CommandBlock {
     pub command_text: String,
     /// The output following the command
     pub output: String,
+    /// The output with ANSI codes stripped (for search/parsing)
+    pub clean_output: String,
     /// The pane ID this command came from (for multi-pane mode)
     pub pane_id: String,
 }
@@ -185,11 +187,16 @@ fn build_block(
         command_text.push_str(&clean_line);
     }
 
+    let output = filtered_output.join("\n");
+    let clean_output_bytes = strip_ansi_escapes::strip(&output);
+    let clean_output = String::from_utf8_lossy(&clean_output_bytes).into_owned();
+
     CommandBlock {
         command: full_command,
         clean_command: String::from_utf8_lossy(&clean_bytes).into_owned(),
         command_text,
-        output: filtered_output.join("\n"),
+        output,
+        clean_output,
         pane_id: String::new(), // Set by caller after parsing
     }
 }
@@ -340,9 +347,7 @@ pub fn find_json_candidates(blocks: &[CommandBlock]) -> Vec<JsonBlock> {
     let mut json_blocks = Vec::new();
 
     for block in blocks {
-        // Strip ANSI codes from output before JSON parsing
-        let clean_bytes = strip_ansi_escapes::strip(&block.output);
-        let text = String::from_utf8_lossy(&clean_bytes);
+        let text = &block.clean_output;
         if text.trim().is_empty() {
             continue;
         }
@@ -474,12 +479,8 @@ pub fn find_path_candidates(blocks: &[CommandBlock]) -> Vec<PathBlock> {
     let mut seen: HashSet<String> = HashSet::new();
 
     for block in blocks {
-        // Strip ANSI codes from output
-        let clean_bytes = strip_ansi_escapes::strip(&block.output);
-        let text = String::from_utf8_lossy(&clean_bytes);
-
         // Also scan the command itself (paths often appear in commands)
-        let sources = [text.as_ref(), block.clean_command.as_str()];
+        let sources = [block.clean_output.as_str(), block.clean_command.as_str()];
 
         for source in sources {
             // Find URLs
