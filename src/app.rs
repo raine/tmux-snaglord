@@ -484,38 +484,24 @@ impl App {
                 }
             }
             Action::SwitchMode => {
-                self.mode = match self.mode {
+                let next = match self.mode {
                     Mode::Commands => Mode::Paths,
                     Mode::Paths => Mode::Json,
                     Mode::Json => Mode::Commands,
                 };
-                self.scroll_offset = 0;
-                self.update_search_results();
+                self.set_mode(next);
             }
             Action::SwitchModePrev => {
-                self.mode = match self.mode {
+                let prev = match self.mode {
                     Mode::Commands => Mode::Json,
                     Mode::Json => Mode::Paths,
                     Mode::Paths => Mode::Commands,
                 };
-                self.scroll_offset = 0;
-                self.update_search_results();
+                self.set_mode(prev);
             }
-            Action::SwitchToCommands => {
-                self.mode = Mode::Commands;
-                self.scroll_offset = 0;
-                self.update_search_results();
-            }
-            Action::SwitchToJson => {
-                self.mode = Mode::Json;
-                self.scroll_offset = 0;
-                self.update_search_results();
-            }
-            Action::SwitchToPaths => {
-                self.mode = Mode::Paths;
-                self.scroll_offset = 0;
-                self.update_search_results();
-            }
+            Action::SwitchToCommands => self.set_mode(Mode::Commands),
+            Action::SwitchToJson => self.set_mode(Mode::Json),
+            Action::SwitchToPaths => self.set_mode(Mode::Paths),
             Action::TogglePreviousPane => {
                 // Cycle: Original -> Previous -> All -> Original
                 self.view_source = match self.view_source {
@@ -568,6 +554,12 @@ impl App {
                 self.selection.push(idx);
             }
         }
+    }
+
+    fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+        self.scroll_offset = 0;
+        self.update_search_results();
     }
 
     /// Move selection to the next item
