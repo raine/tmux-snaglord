@@ -283,9 +283,11 @@ pub fn parse_history(raw_content: &str, prompt_regex: &Regex) -> Vec<CommandBloc
         let extracted_cmd = extract_command(&clean_line, prompt_regex);
         let is_valid_prompt = extracted_cmd.is_some();
 
-        // Skip duplicate consecutive commands (tmux captures both typing and after Enter)
+        // Skip duplicate consecutive commands (tmux captures both typing and after Enter).
+        // Only treat as duplicate when there's no output yet — if there's output between
+        // two identical prompts, they're genuinely separate command runs.
         let is_duplicate = if let (Some(cmd), Some(last)) = (&extracted_cmd, &last_command) {
-            cmd == last
+            cmd == last && current_output.is_empty()
         } else {
             false
         };
@@ -939,6 +941,33 @@ mod tests {
 
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].command_text, "echo hello");
+    }
+
+    #[test]
+    fn test_same_command_run_twice() {
+        // When the same command is run twice, both should appear as separate blocks
+        let content = "$ echo hello\nhello\n$ echo hello\nhello\n";
+        let re = Regex::new(r"^\$ ").unwrap();
+        let blocks = parse_history(content, &re);
+
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].clean_command, "$ echo hello");
+        assert_eq!(blocks[0].output, "hello");
+        assert_eq!(blocks[1].clean_command, "$ echo hello");
+        assert_eq!(blocks[1].output, "hello");
+    }
+
+    #[test]
+    fn test_duplicate_prompt_dedup_still_works() {
+        // Tmux captures the prompt both while typing and after Enter (no output between)
+        // These consecutive identical prompts should still be deduplicated
+        let content = "$ echo hello\n$ echo hello\nhello\n";
+        let re = Regex::new(r"^\$ ").unwrap();
+        let blocks = parse_history(content, &re);
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].clean_command, "$ echo hello");
+        assert_eq!(blocks[0].output, "hello");
     }
 
     #[test]
