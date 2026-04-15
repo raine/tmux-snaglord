@@ -51,7 +51,7 @@ curl -fsSL https://raw.githubusercontent.com/raine/tmux-snaglord/main/scripts/in
 ### Homebrew (macOS/Linux)
 
 ```sh
-brew install raine/tap/tmux-snaglord
+brew install raine/tmux-snaglord/tmux-snaglord
 ```
 
 ### Cargo
