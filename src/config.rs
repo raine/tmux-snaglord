@@ -18,6 +18,13 @@ pub struct Config {
     /// Use Nerd Font / Powerline glyphs (default: false)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nerd_fonts: Option<bool>,
+    /// Number of terminal lines a single shell prompt occupies (default: 1).
+    /// Set to 2+ for multiline prompts (e.g., starship with a newline before `❯`).
+    /// The `prompt` regex should still match the line containing the actual
+    /// prompt character; this tells the parser how many decorative lines
+    /// above it to treat as part of the prompt rather than prior output.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_lines: Option<usize>,
 }
 
 impl Config {

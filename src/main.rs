@@ -110,6 +110,7 @@ fn run_init(target: Option<&str>) -> Result<()> {
                 preset: Some(preset.name.to_string()),
                 prompt: None,
                 nerd_fonts: None,
+                prompt_lines: None,
             };
 
             let path = config.save()?;
@@ -136,6 +137,9 @@ fn run_tui(args: RunArgs) -> Result<()> {
     // Resolve nerd fonts preference: Config > Default (false)
     let use_nerd_fonts = config.nerd_fonts.unwrap_or(false);
 
+    // Resolve prompt_lines: Config > Default (1). Zero is treated as 1.
+    let prompt_lines = config.prompt_lines.unwrap_or(1).max(1);
+
     // Validate regex early (before potentially slow tmux capture)
     let prompt_re = Regex::new(&prompt_pattern).context(format!(
         "Invalid prompt regex pattern: '{}'",
@@ -146,7 +150,13 @@ fn run_tui(args: RunArgs) -> Result<()> {
     let target_pane_id = tmux::resolve_pane_id(args.target.as_deref())?;
 
     // Create app (loads content from pane internally)
-    let mut app = App::new(prompt_re, use_nerd_fonts, prompt_pattern, target_pane_id);
+    let mut app = App::new(
+        prompt_re,
+        use_nerd_fonts,
+        prompt_pattern,
+        target_pane_id,
+        prompt_lines,
+    );
 
     // Setup terminal
     enable_raw_mode()?;

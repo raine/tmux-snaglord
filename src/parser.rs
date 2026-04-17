@@ -263,6 +263,24 @@ fn find_right_prompt_start(s: &str) -> Option<usize> {
 /// continuations). ANSI escape codes are stripped for regex matching but
 /// preserved in the output for display.
 pub fn parse_history(raw_content: &str, prompt_regex: &Regex) -> Vec<CommandBlock> {
+    parse_history_ex(raw_content, prompt_regex, 1)
+}
+
+/// Like `parse_history`, but with a configurable prompt height.
+///
+/// `prompt_lines` is the total number of terminal lines a single shell prompt
+/// occupies. For single-line prompts (the common case) pass 1. For multiline
+/// prompts (e.g., starship with a dir/time header above `❯`) pass 2 or more.
+/// The `prompt_regex` must still match the *last* line of the prompt (the one
+/// containing the command); the `prompt_lines - 1` lines immediately above it
+/// are treated as prompt decoration and stripped from the prior command's
+/// output.
+pub fn parse_history_ex(
+    raw_content: &str,
+    prompt_regex: &Regex,
+    prompt_lines: usize,
+) -> Vec<CommandBlock> {
+    let header_lines = prompt_lines.saturating_sub(1);
     let mut blocks = Vec::new();
     let lines: Vec<&str> = raw_content.lines().collect();
 
@@ -270,6 +288,19 @@ pub fn parse_history(raw_content: &str, prompt_regex: &Regex) -> Vec<CommandBloc
     let mut current_output: Vec<&str> = Vec::new();
     let mut state = CommandState::default();
     let mut last_command: Option<String> = None; // Track last command for deduplication
+
+    // Strip the `header_lines` lines immediately preceding a prompt from the
+    // current output buffer — they're decoration for the upcoming prompt,
+    // not output from the previous command.
+    let strip_header = |buf: &mut Vec<&str>, n: usize| {
+        for _ in 0..n {
+            if buf.last().is_some() {
+                buf.pop();
+            } else {
+                break;
+            }
+        }
+    };
 
     for line in lines {
         // Strip ANSI codes for regex matching and syntax analysis
@@ -293,8 +324,11 @@ pub fn parse_history(raw_content: &str, prompt_regex: &Regex) -> Vec<CommandBloc
         };
 
         if is_valid_prompt && !state.needs_continuation() && !is_duplicate {
-            // New prompt detected and previous command is complete
-            // Push previous block if exists
+            // New prompt detected and previous command is complete.
+            // Strip any decorative header lines (multiline prompts) from the
+            // previous command's output before pushing its block.
+            strip_header(&mut current_output, header_lines);
+
             if !current_command_lines.is_empty() {
                 blocks.push(build_block(
                     &current_command_lines,
@@ -312,7 +346,9 @@ pub fn parse_history(raw_content: &str, prompt_regex: &Regex) -> Vec<CommandBloc
             state.process_line(&clean_line);
             last_command = extracted_cmd;
         } else if is_duplicate {
-            // Skip duplicate prompt lines entirely (don't add to output)
+            // Skip duplicate prompt lines entirely (don't add to output),
+            // but still strip header lines — they belong to this prompt.
+            strip_header(&mut current_output, header_lines);
             continue;
         } else if state.needs_continuation() {
             // Previous line was incomplete, this is a continuation
@@ -321,6 +357,7 @@ pub fn parse_history(raw_content: &str, prompt_regex: &Regex) -> Vec<CommandBloc
         } else if !current_command_lines.is_empty() {
             // Skip empty prompts (match regex but no command) - don't add to output
             if is_prompt_match {
+                strip_header(&mut current_output, header_lines);
                 continue;
             }
             // Command is complete, this is output
@@ -329,7 +366,10 @@ pub fn parse_history(raw_content: &str, prompt_regex: &Regex) -> Vec<CommandBloc
         // Lines before first prompt are ignored
     }
 
-    // Push final block
+    // Push final block. Don't strip headers here — we can't tell whether the
+    // trailing lines are prompt decoration or real output. A trailing bare
+    // prompt (common case) will already have triggered the in-loop strip via
+    // the `is_prompt_match` branch above.
     if !current_command_lines.is_empty() {
         blocks.push(build_block(
             &current_command_lines,
@@ -968,6 +1008,109 @@ mod tests {
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].clean_command, "$ echo hello");
         assert_eq!(blocks[0].output, "hello");
+    }
+
+    // === Multiline prompt tests (prompt_lines > 1) ===
+
+    #[test]
+    fn test_multiline_prompt_basic() {
+        // Starship-style: dir+time on line 1, ❯ on line 2
+        let content = "\
+~/code   08:00
+❯ ls
+file1
+file2
+~/code   08:01
+❯ pwd
+/home/user/code
+";
+        let re = Regex::new(r"^❯ ").unwrap();
+        let blocks = parse_history_ex(content, &re, 2);
+
+        assert_eq!(blocks.len(), 2);
+        // Newest first
+        assert_eq!(blocks[0].clean_command, "❯ pwd");
+        assert_eq!(blocks[0].output, "/home/user/code");
+        assert_eq!(blocks[1].clean_command, "❯ ls");
+        // The "~/code   08:01" decoration line should NOT be in the ls output
+        assert_eq!(blocks[1].output, "file1\nfile2");
+    }
+
+    #[test]
+    fn test_multiline_prompt_trailing_redraw() {
+        // Capture ends with a bare redrawn prompt (no command yet)
+        let content = "\
+~/code   08:00
+❯ ls
+file1
+~/code   08:01
+❯
+";
+        let re = Regex::new(r"^❯").unwrap();
+        let blocks = parse_history_ex(content, &re, 2);
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].clean_command, "❯ ls");
+        assert_eq!(blocks[0].output, "file1");
+    }
+
+    #[test]
+    fn test_multiline_prompt_three_lines() {
+        // Hypothetical 3-line prompt
+        let content = "\
+─── line1 ───
+dir info
+❯ echo hi
+hi
+─── line1 ───
+dir info
+❯ ls
+out
+";
+        let re = Regex::new(r"^❯ ").unwrap();
+        let blocks = parse_history_ex(content, &re, 3);
+
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].clean_command, "❯ ls");
+        assert_eq!(blocks[0].output, "out");
+        assert_eq!(blocks[1].clean_command, "❯ echo hi");
+        assert_eq!(blocks[1].output, "hi");
+    }
+
+    #[test]
+    fn test_single_line_prompt_unchanged_by_ex() {
+        // prompt_lines=1 should behave identically to parse_history
+        let content = "$ echo hello\nhello\n$ ls\nfile1\nfile2\n";
+        let re = Regex::new(r"^\$ ").unwrap();
+        let blocks_ex = parse_history_ex(content, &re, 1);
+        let blocks = parse_history(content, &re);
+
+        assert_eq!(blocks_ex.len(), blocks.len());
+        for (a, b) in blocks_ex.iter().zip(blocks.iter()) {
+            assert_eq!(a.clean_command, b.clean_command);
+            assert_eq!(a.output, b.output);
+        }
+    }
+
+    #[test]
+    fn test_multiline_prompt_short_output_dropped() {
+        // If a command has fewer output lines than header_lines, stripping
+        // shouldn't panic — it just drops what's there.
+        let content = "\
+~/code   08:00
+❯ true
+~/code   08:01
+❯ ls
+file
+";
+        let re = Regex::new(r"^❯ ").unwrap();
+        let blocks = parse_history_ex(content, &re, 2);
+
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].clean_command, "❯ ls");
+        assert_eq!(blocks[0].output, "file");
+        assert_eq!(blocks[1].clean_command, "❯ true");
+        assert_eq!(blocks[1].output, "");
     }
 
     #[test]
