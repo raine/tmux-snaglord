@@ -178,6 +178,32 @@ preset for your shell, or configure a custom pattern.
 depends on your prompt configuration. Heavily customized prompts or command
 output that resembles your prompt may cause incorrect parsing.
 
+### Multiline prompts
+
+Some prompts span multiple terminal lines — e.g. a Starship config with a
+directory/time line above the actual `❯` prompt character:
+
+```
+~/code   08:27:27 AM           ← prompt decoration (line 1)
+main ❯ git remote -v           ← actual prompt + command (line 2)
+origin  git@github:foo/bar.git (fetch)
+origin  git@github:foo/bar.git (push)
+```
+
+By default the parser treats each prompt as a single line, so the `~/code
+08:27:27 AM` decoration gets attached to the *previous* command's output.
+Set `prompt_lines` in your config to tell the parser how many terminal
+lines each prompt occupies:
+
+```toml
+preset = "starship"
+prompt_lines = 2
+```
+
+The `prompt` regex (or `preset`) should still match the *last* line of
+the prompt — the one with the command. The `prompt_lines - 1` decoration
+lines directly above it are stripped from the preceding command's output.
+
 ## Configuration
 
 You can persist preferences in `~/.config/tmux-snaglord/config.toml`:
@@ -192,10 +218,8 @@ preset = "starship"
 # Enable Nerd Font icons and Powerline glyphs (default: false)
 # nerd_fonts = true
 
-# For multiline prompts (e.g., starship with a dir/time line above `❯`),
-# set how many terminal lines your prompt occupies. The `prompt` regex
-# should still match the *last* line; the lines above are treated as
-# prompt decoration instead of previous-command output. Default: 1.
+# Number of terminal lines each prompt occupies (default: 1).
+# See "Multiline prompts" above for details.
 # prompt_lines = 2
 ```
 
