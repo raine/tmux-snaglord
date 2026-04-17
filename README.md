@@ -191,6 +191,12 @@ preset = "starship"
 
 # Enable Nerd Font icons and Powerline glyphs (default: false)
 # nerd_fonts = true
+
+# For multiline prompts (e.g., starship with a dir/time line above `❯`),
+# set how many terminal lines your prompt occupies. The `prompt` regex
+# should still match the *last* line; the lines above are treated as
+# prompt decoration instead of previous-command output. Default: 1.
+# prompt_lines = 2
 ```
 
 ### Presets

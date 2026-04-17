@@ -12,7 +12,8 @@ use clap::ValueEnum;
 
 use crate::action::Action;
 use crate::parser::{
-    CommandBlock, JsonBlock, PathBlock, find_json_candidates, find_path_candidates, parse_history,
+    CommandBlock, JsonBlock, PathBlock, find_json_candidates, find_path_candidates,
+    parse_history_ex,
 };
 use crate::tmux;
 use crate::utils::escape_debug;
@@ -270,6 +271,8 @@ pub struct App {
     // Parsing state
     /// Prompt pattern regex for re-parsing on reload
     prompt_re: Regex,
+    /// Number of terminal lines a single prompt occupies (1 for single-line prompts)
+    prompt_lines: usize,
 
     // Error state
     /// Transient error message to display in UI
@@ -293,6 +296,7 @@ impl App {
         nerd_fonts: bool,
         prompt_pattern: String,
         original_pane_id: String,
+        prompt_lines: usize,
     ) -> Self {
         let mut app = Self {
             mode: Mode::Commands,
@@ -307,6 +311,7 @@ impl App {
             search_query: String::new(),
             is_searching: false,
             prompt_re,
+            prompt_lines,
             error_msg: None,
             show_help: false,
             view_source: ViewSource::Original,
@@ -346,7 +351,7 @@ impl App {
     /// Capture and parse a specific pane, appending to blocks
     fn ingest_pane(&mut self, pane_id: &str) -> Result<()> {
         let content = tmux::capture_pane(pane_id)?;
-        let mut new_blocks = parse_history(&content, &self.prompt_re);
+        let mut new_blocks = parse_history_ex(&content, &self.prompt_re, self.prompt_lines);
 
         // Tag each block with its source pane
         for block in &mut new_blocks {
