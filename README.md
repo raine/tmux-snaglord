@@ -180,25 +180,29 @@ output that resembles your prompt may cause incorrect parsing.
 
 ### Multiline prompts
 
-Some prompts span multiple terminal lines — e.g. a Starship config with a
-directory/time line above the actual `❯` prompt character:
+Some prompts span multiple terminal lines — e.g. default Starship, which
+puts a blank separator and a module line above the `❯` character:
 
 ```
-~/code   08:27:27 AM           ← prompt decoration (line 1)
-main ❯ git remote -v           ← actual prompt + command (line 2)
+                               ← blank separator (line 1, from add_newline)
+~/code on  main                ← prompt decoration (line 2)
+❯ git remote -v                ← actual prompt + command (line 3)
 origin  git@github:foo/bar.git (fetch)
 origin  git@github:foo/bar.git (push)
 ```
 
-By default the parser treats each prompt as a single line, so the `~/code
-08:27:27 AM` decoration gets attached to the *previous* command's output.
-Set `prompt_lines` in your config to tell the parser how many terminal
-lines each prompt occupies:
+By default the parser treats each prompt as a single line, so the blank
+line and `~/code on main` decoration get attached to the *previous*
+command's output. Set `prompt_lines` in your config to tell the parser
+how many terminal lines each prompt occupies:
 
 ```toml
 preset = "starship"
-prompt_lines = 2
+prompt_lines = 3   # blank + modules + ❯ line (default Starship)
 ```
+
+Set `prompt_lines = 2` if you've disabled Starship's `add_newline`, or
+higher if your custom format adds more lines above `❯`.
 
 The `prompt` regex (or `preset`) should still match the *last* line of
 the prompt — the one with the command. The `prompt_lines - 1` decoration
