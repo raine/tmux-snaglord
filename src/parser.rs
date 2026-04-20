@@ -318,7 +318,10 @@ pub fn parse_history_ex(
         // Only treat as duplicate when there's no output yet — if there's output between
         // two identical prompts, they're genuinely separate command runs.
         let is_duplicate = if let (Some(cmd), Some(last)) = (&extracted_cmd, &last_command) {
-            cmd == last && current_output.is_empty()
+            // With multiline prompts, the header lines of this duplicate prompt
+            // are already in `current_output`; treat output-of-length-≤-header
+            // as "no real output between the two prompts".
+            cmd == last && current_output.len() <= header_lines
         } else {
             false
         };
@@ -1011,6 +1014,25 @@ mod tests {
     }
 
     // === Multiline prompt tests (prompt_lines > 1) ===
+
+    #[test]
+    fn test_multiline_prompt_dedup_bug_repro() {
+        // Typed command + post-Enter redraw: tmux captures the same prompt
+        // twice with the decoration between them. Should dedupe to ONE block.
+        let content = "\
+~/code   08:00
+❯ ls
+~/code   08:00
+❯ ls
+file1
+";
+        let re = Regex::new(r"^❯ ").unwrap();
+        let blocks = parse_history_ex(content, &re, 2);
+
+        assert_eq!(blocks.len(), 1, "duplicate prompts should be deduped");
+        assert_eq!(blocks[0].clean_command, "❯ ls");
+        assert_eq!(blocks[0].output, "file1");
+    }
 
     #[test]
     fn test_multiline_prompt_basic() {
