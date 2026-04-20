@@ -33,10 +33,12 @@ pub const PRESETS: &[Preset] = &[
         regex: r"^➜  ",
         description: "Oh My Zsh robbyrussell theme",
     },
-    // Starship default symbol
+    // Starship default symbol. `❯` followed by space *or* end-of-line so
+    // bare prompt redraws (where tmux has stripped trailing space) still
+    // match.
     Preset {
         name: "starship",
-        regex: r"^❯ ",
+        regex: r"^❯(?: |$)",
         description: "Starship default prompt",
     },
     // Simple fallbacks
