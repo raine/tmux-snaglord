@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.8 (2026-05-31)
+
+- Add shortcuts to save command output or full command text to a temp file and copy the file path.
+
 ## v0.1.7 (2026-04-20)
 
 - Add support for multi-line shell prompts via the `prompt_lines` config option
