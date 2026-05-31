@@ -1,8 +1,11 @@
 //! Application state management
 
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use ratatui::widgets::ListState;
@@ -50,6 +53,17 @@ impl FuzzySearchable for CommandBlock {
 
 fn best_score(a: Option<i64>, b: Option<i64>) -> Option<(i64, Option<Vec<usize>>)> {
     a.into_iter().chain(b).max().map(|s| (s, None))
+}
+
+fn write_temp_file(content: &str) -> Result<PathBuf> {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let path =
+        std::env::temp_dir().join(format!("tmux-snaglord-{}-{nanos}.txt", std::process::id()));
+    fs::write(&path, content).context("Failed to write temp file")?;
+    Ok(path)
 }
 
 impl FuzzySearchable for JsonBlock {
@@ -455,6 +469,24 @@ impl App {
                     && let Some(debug) = self.get_selected_debug()
                 {
                     tmux::copy_to_clipboard(&debug)?;
+                    return Ok(UpdateResult::Quit);
+                }
+            }
+            Action::CopyTempFile => {
+                if self.mode == Mode::Commands
+                    && let Some(content) = self.get_output_payload()
+                {
+                    let path = write_temp_file(&content)?;
+                    tmux::copy_to_clipboard(&path.to_string_lossy())?;
+                    return Ok(UpdateResult::Quit);
+                }
+            }
+            Action::CopyFullTempFile => {
+                if self.mode == Mode::Commands
+                    && let Some(content) = self.get_full_payload()
+                {
+                    let path = write_temp_file(&content)?;
+                    tmux::copy_to_clipboard(&path.to_string_lossy())?;
                     return Ok(UpdateResult::Quit);
                 }
             }

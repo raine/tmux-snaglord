@@ -130,6 +130,8 @@ want to run the tool from a different pane than the one you're inspecting.
 | `y`     | Copy output only                     |
 | `Y`     | Copy full (command + output)         |
 | `c`     | Copy command only                    |
+| `t`     | Write output to temp file, copy path |
+| `T`     | Write full text to temp file, copy path |
 | `p`     | Paste output to original pane        |
 | `P`     | Paste full to original pane          |
 | `D`     | Copy debug format (raw with escapes) |

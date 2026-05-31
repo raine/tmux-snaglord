@@ -579,6 +579,8 @@ fn render_help_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             ("Y", "cmd+out"),
             ("y", "out"),
             ("c", "cmd"),
+            ("T", "tmp cmd+out"),
+            ("t", "tmp out"),
             ("P", "paste cmd+out"),
             ("p", "paste out"),
             ("q", "quit"),
@@ -659,6 +661,8 @@ fn help_rows(mode: Mode) -> Vec<(&'static str, &'static str)> {
                 ("y", "Copy output"),
                 ("Y", "Copy command + output"),
                 ("c", "Copy command"),
+                ("t", "Copy output temp file path"),
+                ("T", "Copy command + output temp file path"),
                 ("p", "Paste output"),
                 ("P", "Paste command + output"),
             ]);

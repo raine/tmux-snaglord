@@ -292,6 +292,8 @@ fn get_action(key: KeyEvent, app: &App) -> Option<Action> {
         KeyCode::Char('Y') => Some(Action::CopyFull),
         KeyCode::Char('c') => Some(Action::CopyCommand),
         KeyCode::Char('D') => Some(Action::CopyDebug),
+        KeyCode::Char('t') => Some(Action::CopyTempFile),
+        KeyCode::Char('T') => Some(Action::CopyFullTempFile),
         KeyCode::Char('p') => Some(Action::PasteOutput),
         KeyCode::Char('P') => Some(Action::PasteFull),
         KeyCode::Char('?') => Some(Action::ShowHelp),

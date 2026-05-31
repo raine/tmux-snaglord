@@ -31,6 +31,10 @@ pub enum Action {
     CopyCommand,
     /// Copy debug info to clipboard
     CopyDebug,
+    /// Write selected output to a temp file and copy its path to clipboard
+    CopyTempFile,
+    /// Write selected command + output to a temp file and copy its path to clipboard
+    CopyFullTempFile,
     /// Toggle selection of the current item for scratchpad
     ToggleSelection,
     /// Clear all selections in the scratchpad
